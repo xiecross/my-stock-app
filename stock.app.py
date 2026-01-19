@@ -454,20 +454,27 @@ def get_stock_history(symbol, start_date, end_date, adjust='qfq'):
         st.error(f"获取历史数据失败: {e}")
         return None
 
-@st.cache_data(ttl=300)  # 5分钟缓存
-def search_stock(query):
-    """搜索股票"""
+@st.cache_data(ttl=3600)  # 1小时缓存 - 股票列表变化不频繁
+def get_stock_list():
+    """获取A股股票列表（缓存1小时）"""
     try:
-        stock_list = ak.stock_zh_a_spot_em()
-        query = query.upper()
-        filtered = stock_list[
-            stock_list['代码'].str.contains(query) | 
-            stock_list['名称'].str.contains(query)
-        ].head(20)
-        return filtered
+        return ak.stock_zh_a_spot_em()
     except Exception as e:
-        st.error(f"搜索失败: {e}")
+        st.error(f"获取股票列表失败: {e}")
         return None
+
+def search_stock(query):
+    """搜索股票（使用缓存的股票列表）"""
+    stock_list = get_stock_list()
+    if stock_list is None:
+        return None
+    
+    query = query.upper()
+    filtered = stock_list[
+        stock_list['代码'].str.contains(query) | 
+        stock_list['名称'].str.contains(query)
+    ].head(20)
+    return filtered
 
 @st.cache_data(ttl=60)  # 1分钟缓存 - 更实时的市场数据
 def get_market_indices():
@@ -683,9 +690,10 @@ with st.sidebar:
     st.header("⚙️ 控制台")
     
     # 股票搜索
-    search_query = st.text_input("🔍 搜索股票", placeholder="输入代码或名称...")
-    if search_query:
-        search_results = search_stock(search_query)
+    search_query = st.text_input("🔍 搜索股票", placeholder="输入代码或名称（至少2个字符）...")
+    if search_query and len(search_query) >= 2:  # 至少2个字符才搜索
+        with st.spinner('搜索中...'):
+            search_results = search_stock(search_query)
         if search_results is not None and not search_results.empty:
             selected = st.selectbox(
                 "选择股票",
