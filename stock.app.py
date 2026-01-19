@@ -86,8 +86,7 @@ def check_password():
             st.session_state["password_correct"] = True
             st.query_params["auth"] = st.secrets["app_password"]
             del st.session_state["password"]
-            # 立即重新运行，避免卡顿
-            st.rerun()
+            # Streamlit自动在callback后重新运行，无需手动调用st.rerun()
         else:
             st.session_state["password_correct"] = False
     
