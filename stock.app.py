@@ -16,31 +16,82 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# 自定义CSS样式 - 优化移动端体验
+# 自定义CSS样式 - 优化移动端体验 + 自适应主题
 st.markdown("""
 <style>
+    /* CSS变量定义 - 深色主题（默认） */
+    :root {
+        --bg-primary: #0a0e27;
+        --bg-secondary: #131722;
+        --bg-tertiary: #1e222d;
+        --bg-hover: #2a2e39;
+        
+        --text-primary: #d1d4dc;
+        --text-secondary: #787b86;
+        --text-tertiary: #434651;
+        
+        --border-color: #2a2e39;
+        --border-light: #363a45;
+        
+        --accent-blue: #2962ff;
+        --gradient-start: #667eea;
+        --gradient-end: #764ba2;
+        
+        --modebar-bg: rgba(19, 23, 34, 0.9);
+        --refresh-info-bg: #131722;
+        --refresh-info-border: #2962ff;
+    }
+    
+    /* 浅色主题 - 根据系统设置自动切换 */
+    @media (prefers-color-scheme: light) {
+        :root {
+            --bg-primary: #ffffff;
+            --bg-secondary: #f5f5f5;
+            --bg-tertiary: #e8e8e8;
+            --bg-hover: #d0d0d0;
+            
+            --text-primary: #1a1a1a;
+            --text-secondary: #666666;
+            --text-tertiary: #999999;
+            
+            --border-color: #e0e0e0;
+            --border-light: #cccccc;
+            
+            --accent-blue: #2962ff;
+            --gradient-start: #667eea;
+            --gradient-end: #764ba2;
+            
+            --modebar-bg: rgba(245, 245, 245, 0.9);
+            --refresh-info-bg: #f5f5f5;
+            --refresh-info-border: #2962ff;
+        }
+    }
+    
     .main {
-        background-color: #0a0e27;
+        background-color: var(--bg-primary);
+        color: var(--text-primary);
     }
     .stApp {
-        background-color: #0a0e27;
+        background-color: var(--bg-primary);
+        color: var(--text-primary);
     }
     div[data-testid="stMetricValue"] {
         font-size: 24px;
         font-weight: 700;
+        color: var(--text-primary);
     }
     .stock-header {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        background: linear-gradient(135deg, var(--gradient-start) 0%, var(--gradient-end) 100%);
         padding: 20px;
         border-radius: 10px;
         margin-bottom: 20px;
         color: white;
     }
     .indicator-card {
-        background-color: #131722;
+        background-color: var(--bg-secondary);
         padding: 15px;
         border-radius: 8px;
-        border: 1px solid #2a2e39;
+        border: 1px solid var(--border-color);
         margin-bottom: 10px;
     }
     /* 移动端优化 */
@@ -55,21 +106,22 @@ st.markdown("""
     /* 图表触摸优化 */
     .js-plotly-plot .plotly .modebar {
         left: 0 !important;
-        background: rgba(19, 23, 34, 0.9) !important;
+        background: var(--modebar-bg) !important;
         padding: 5px !important;
     }
     .refresh-info {
-        background-color: #131722;
+        background-color: var(--refresh-info-bg);
         padding: 10px;
         border-radius: 5px;
-        border-left: 3px solid #2962ff;
+        border-left: 3px solid var(--refresh-info-border);
         margin: 10px 0;
         font-size: 13px;
+        color: var(--text-primary);
     }
     
-    /* 全屏模式样式 - 深色主题（默认） */
+    /* 全屏模式样式 */
     .chart-fullscreen-container:fullscreen {
-        background-color: #0a0e27;
+        background-color: var(--bg-primary);
         padding: 20px;
         display: flex;
         align-items: center;
@@ -77,7 +129,7 @@ st.markdown("""
     }
     
     .chart-fullscreen-container:-webkit-full-screen {
-        background-color: #0a0e27;
+        background-color: var(--bg-primary);
         padding: 20px;
         display: flex;
         align-items: center;
@@ -85,7 +137,7 @@ st.markdown("""
     }
     
     .chart-fullscreen-container:-moz-full-screen {
-        background-color: #0a0e27;
+        background-color: var(--bg-primary);
         padding: 20px;
         display: flex;
         align-items: center;
@@ -93,49 +145,11 @@ st.markdown("""
     }
     
     .chart-fullscreen-container:-ms-fullscreen {
-        background-color: #0a0e27;
+        background-color: var(--bg-primary);
         padding: 20px;
         display: flex;
         align-items: center;
         justify-content: center;
-    }
-    
-    /* 浅色主题适配 */
-    @media (prefers-color-scheme: light) {
-        .chart-fullscreen-container:fullscreen {
-            background-color: #f5f5f5;
-        }
-        
-        .chart-fullscreen-container:-webkit-full-screen {
-            background-color: #f5f5f5;
-        }
-        
-        .chart-fullscreen-container:-moz-full-screen {
-            background-color: #f5f5f5;
-        }
-        
-        .chart-fullscreen-container:-ms-fullscreen {
-            background-color: #f5f5f5;
-        }
-    }
-    
-    /* 深色主题适配（显式声明） */
-    @media (prefers-color-scheme: dark) {
-        .chart-fullscreen-container:fullscreen {
-            background-color: #0a0e27;
-        }
-        
-        .chart-fullscreen-container:-webkit-full-screen {
-            background-color: #0a0e27;
-        }
-        
-        .chart-fullscreen-container:-moz-full-screen {
-            background-color: #0a0e27;
-        }
-        
-        .chart-fullscreen-container:-ms-fullscreen {
-            background-color: #0a0e27;
-        }
     }
     
     /* 全屏时图表占满整个屏幕 */
@@ -148,6 +162,62 @@ st.markdown("""
 </style>
 
 <script>
+// 主题检测和自动切换功能
+(function() {
+    // 检测当前系统主题
+    function getCurrentTheme() {
+        return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    }
+    
+    // 更新Plotly图表主题
+    function updatePlotlyTheme(theme) {
+        const plotlyCharts = document.querySelectorAll('.js-plotly-plot');
+        plotlyCharts.forEach(function(chart) {
+            if (chart && chart.layout) {
+                const newTemplate = theme === 'dark' ? 'plotly_dark' : 'plotly_white';
+                try {
+                    // 更新图表模板
+                    Plotly.relayout(chart, {
+                        template: newTemplate,
+                        paper_bgcolor: theme === 'dark' ? '#0a0e27' : '#ffffff',
+                        plot_bgcolor: theme === 'dark' ? '#0a0e27' : '#ffffff'
+                    });
+                    console.log('图表主题已更新为:', theme);
+                } catch (error) {
+                    console.log('更新图表主题时出错:', error);
+                }
+            }
+        });
+    }
+    
+    // 监听系统主题变化
+    if (window.matchMedia) {
+        const darkModeQuery = window.matchMedia('(prefers-color-scheme: dark)');
+        
+        // 主题变化处理函数
+        function handleThemeChange(e) {
+            const newTheme = e.matches ? 'dark' : 'light';
+            console.log('系统主题已切换为:', newTheme);
+            
+            // 延迟更新以确保Plotly已加载
+            setTimeout(function() {
+                updatePlotlyTheme(newTheme);
+            }, 500);
+        }
+        
+        // 添加监听器
+        if (darkModeQuery.addEventListener) {
+            darkModeQuery.addEventListener('change', handleThemeChange);
+        } else if (darkModeQuery.addListener) {
+            // 兼容旧版浏览器
+            darkModeQuery.addListener(handleThemeChange);
+        }
+        
+        // 初始化时设置正确的主题
+        console.log('当前系统主题:', getCurrentTheme());
+    }
+})();
+
 // 移动端全屏横屏功能
 (function() {
     // 检测是否为移动设备
@@ -839,6 +909,6 @@ else:
 st.divider()
 col_footer1, col_footer2 = st.columns([3, 1])
 with col_footer1:
-    st.caption("💡 数据来源: 网络")
+    st.caption("网络")
 with col_footer2:
     st.caption(f"⏰ 当前时间: {datetime.now().strftime('%H:%M:%S')}")
