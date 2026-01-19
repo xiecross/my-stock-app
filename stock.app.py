@@ -107,7 +107,7 @@ def check_password():
                 key="password",
                 placeholder="请输入密码"
             )
-                    return False
+            st.info("💡 提示: 默认密码为 stock2026")
         return False
     
     # 密码错误
