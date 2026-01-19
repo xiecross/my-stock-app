@@ -455,70 +455,12 @@ def get_stock_history(symbol, start_date, end_date, adjust='qfq'):
         return None
 
 # ---------------------------------------------------------
-# 股票数据库管理 - 内存缓存（适配Streamlit Cloud）
+# 股票搜索优化 - 按需搜索 + 智能缓存
 # ---------------------------------------------------------
 
-def load_stock_database_to_session():
-    """加载股票数据库到session_state（仅在会话中执行一次）"""
-    if 'stock_database' not in st.session_state:
-        st.session_state.stock_database = {}
-        st.session_state.stock_db_update_time = 0
-    
-    current_time = datetime.now().timestamp()
-    # 如果数据库为空或超过1小时，则更新（Streamlit Cloud环境下缩短更新间隔）
-    if not st.session_state.stock_database or (current_time - st.session_state.stock_db_update_time) > 3600:
-        try:
-            with st.spinner('正在加载股票数据库...'):
-                stock_list = ak.stock_zh_a_spot_em()
-                stocks_dict = {}
-                for _, row in stock_list.iterrows():
-                    code = str(row['代码'])
-                    name = str(row['名称'])
-                    stocks_dict[code] = name
-                
-                st.session_state.stock_database = stocks_dict
-                st.session_state.stock_db_update_time = current_time
-                return stocks_dict, current_time
-        except Exception as e:
-            print(f"更新股票数据库失败: {e}")
-            # 如果更新失败但已有数据，继续使用旧数据
-            if st.session_state.stock_database:
-                return st.session_state.stock_database, st.session_state.stock_db_update_time
-            return {}, 0
-    
-    return st.session_state.stock_database, st.session_state.stock_db_update_time
-
-def search_stock_fast(query):
-    """快速搜索股票（使用内存数据库）"""
-    try:
-        stocks, update_time = load_stock_database_to_session()
-        
-        if not stocks:
-            # 如果数据库为空，回退到在线搜索
-            return search_stock_online(query)
-        
-        query = query.upper()
-        results = []
-        
-        # 搜索代码和名称
-        for code, name in stocks.items():
-            if query in code or query in name:
-                results.append({'代码': code, '名称': name})
-                if len(results) >= 20:  # 限制返回20条
-                    break
-        
-        if results:
-            df = pd.DataFrame(results)
-            return df
-        else:
-            return pd.DataFrame(columns=['代码', '名称'])
-            
-    except Exception as e:
-        st.error(f"搜索失败: {e}")
-        return None
-
-def search_stock_online(query):
-    """在线搜索股票（备用方案）"""
+@st.cache_data(ttl=300)  # 5分钟缓存搜索结果
+def search_stock_cached(query):
+    """缓存的股票搜索（避免重复API调用）"""
     try:
         stock_list = ak.stock_zh_a_spot_em()
         query = query.upper()
@@ -528,30 +470,20 @@ def search_stock_online(query):
         ].head(20)
         return filtered[['代码', '名称']]
     except Exception as e:
-        st.error(f"在线搜索失败: {e}")
+        st.error(f"搜索失败: {e}")
         return None
 
-def force_refresh_stock_database():
-    """强制刷新股票数据库"""
-    try:
-        stock_list = ak.stock_zh_a_spot_em()
-        stocks_dict = {}
-        for _, row in stock_list.iterrows():
-            code = str(row['代码'])
-            name = str(row['名称'])
-            stocks_dict[code] = name
-        
-        st.session_state.stock_database = stocks_dict
-        st.session_state.stock_db_update_time = datetime.now().timestamp()
-        return stocks_dict, st.session_state.stock_db_update_time
-    except Exception as e:
-        st.error(f"刷新失败: {e}")
-        return {}, 0
-
-# 兼容旧代码的函数名
 def search_stock(query):
-    """搜索股票（优化版本）"""
-    return search_stock_fast(query)
+    """
+    优化的股票搜索
+    - 使用Streamlit缓存避免重复API调用
+    - 相同查询5分钟内直接返回缓存结果
+    - 不同查询才会触发新的API调用
+    """
+    if not query or len(query.strip()) == 0:
+        return None
+    
+    return search_stock_cached(query.strip())
 
 @st.cache_data(ttl=60)  # 1分钟缓存 - 更实时的市场数据
 def get_market_indices():
@@ -765,40 +697,6 @@ if not check_password():
 # 侧边栏
 with st.sidebar:
     st.header("⚙️ 控制台")
-    
-    # 数据库状态显示
-    try:
-        stocks, update_time = load_stock_database_to_session()
-        if stocks:
-            update_datetime = datetime.fromtimestamp(update_time)
-            time_diff = datetime.now() - update_datetime
-            minutes_ago = int(time_diff.total_seconds() / 60)
-            
-            with st.expander("📊 股票数据库状态", expanded=False):
-                st.write(f"**股票数量:** {len(stocks):,} 只")
-                st.write(f"**更新时间:** {update_datetime.strftime('%Y-%m-%d %H:%M')}")
-                if minutes_ago < 60:
-                    st.write(f"**距今:** {minutes_ago} 分钟前")
-                else:
-                    hours_ago = int(minutes_ago / 60)
-                    st.write(f"**距今:** {hours_ago} 小时前")
-                
-                st.caption("💡 数据库存储在会话内存中，每小时自动更新")
-                
-                if st.button("🔄 手动刷新数据库", use_container_width=True):
-                    with st.spinner("正在更新股票数据库..."):
-                        new_stocks, new_time = force_refresh_stock_database()
-                        if new_stocks:
-                            st.success(f"✅ 已更新 {len(new_stocks):,} 只股票数据")
-                            st.rerun()
-                        else:
-                            st.error("❌ 更新失败，请稍后重试")
-        else:
-            st.info("📥 首次使用，正在初始化股票数据库...")
-    except Exception as e:
-        st.warning(f"⚠️ 数据库状态获取失败")
-    
-    st.divider()
     
     # 股票搜索
     search_query = st.text_input("🔍 搜索股票", placeholder="输入代码或名称...")
