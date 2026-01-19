@@ -70,31 +70,33 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ---------------------------------------------------------
-# 密码验证逻辑 (支持 URL 参数自动登录)
+# 密码验证逻辑 (仅使用外部 secrets 配置)
 # ---------------------------------------------------------
 def check_password():
-    """验证登录状态"""
+    """验证登录状态 - 密码完全由 secrets 配置"""
     # 检查 URL 参数自动登录
     if "auth" in st.query_params:
-        if st.query_params["auth"] == st.secrets.get("app_password", "stock2026"):
+        if st.query_params["auth"] == st.secrets["app_password"]:
             st.session_state["password_correct"] = True
             return True
     
     def password_entered():
         """检查输入的密码是否正确"""
-        if st.session_state["password"] == st.secrets.get("app_password", "stock2026"):
+        if st.session_state["password"] == st.secrets["app_password"]:
             st.session_state["password_correct"] = True
-            st.query_params["auth"] = st.secrets.get("app_password", "stock2026")
+            st.query_params["auth"] = st.secrets["app_password"]
             del st.session_state["password"]
+            # 立即重新运行，避免卡顿
+            st.rerun()
         else:
             st.session_state["password_correct"] = False
     
-    # 首次访问
-    if "password_correct" not in st.session_state:
+    # 首次访问或密码错误
+    if "password_correct" not in st.session_state or not st.session_state["password_correct"]:
         st.markdown("""
         <div style='text-align: center; padding: 50px;'>
             <h1>🔒 股票量化分析平台</h1>
-            <p style='color: #787b86; font-size: 16px;'>请输入访问密码以继续</p>
+            <p style='color: #787b86; font-size: 16px;'>请输入访问密码</p>
         </div>
         """, unsafe_allow_html=True)
         
@@ -105,35 +107,19 @@ def check_password():
                 type="password",
                 on_change=password_entered,
                 key="password",
-                placeholder="请输入密码"
+                placeholder="请输入密码",
+                label_visibility="collapsed"
             )
-            st.info("💡 提示: 默认密码为 stock2026")
-        return False
-    
-    # 密码错误
-    elif not st.session_state["password_correct"]:
-        st.markdown("""
-        <div style='text-align: center; padding: 50px;'>
-            <h1>🔒 股票量化分析平台</h1>
-            <p style='color: #787b86; font-size: 16px;'>请输入访问密码以继续</p>
-        </div>
-        """, unsafe_allow_html=True)
+            
+            # 仅在密码错误时显示错误信息
+            if "password_correct" in st.session_state and not st.session_state["password_correct"]:
+                st.error("❌ 密码不正确，请重试")
         
-        col1, col2, col3 = st.columns([1, 2, 1])
-        with col2:
-            st.text_input(
-                "访问密码",
-                type="password",
-                on_change=password_entered,
-                key="password",
-                placeholder="请输入密码"
-            )
-            st.error("❌ 密码不正确，请重试")
         return False
     
     # 密码正确
-    else:
-        return True
+    return True
+
 
 # ---------------------------------------------------------
 # 缓存数据获取函数 - 缩短缓存时间以获取更实时的数据
