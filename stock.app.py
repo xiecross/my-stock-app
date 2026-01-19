@@ -454,27 +454,132 @@ def get_stock_history(symbol, start_date, end_date, adjust='qfq'):
         st.error(f"获取历史数据失败: {e}")
         return None
 
-@st.cache_data(ttl=3600)  # 1小时缓存 - 股票列表变化不频繁
-def get_stock_list():
-    """获取A股股票列表（缓存1小时）"""
+# ---------------------------------------------------------
+# 股票数据库管理 - 本地缓存加速搜索
+# ---------------------------------------------------------
+import json
+import os
+from pathlib import Path
+
+# 数据库文件路径
+DB_DIR = Path(__file__).parent / 'data'
+STOCK_DB_FILE = DB_DIR / 'stock_list.json'
+DB_UPDATE_INTERVAL = 86400  # 24小时更新一次
+
+def ensure_db_dir():
+    """确保数据目录存在"""
+    DB_DIR.mkdir(exist_ok=True)
+
+def load_stock_database():
+    """从本地加载股票数据库"""
     try:
-        return ak.stock_zh_a_spot_em()
+        if STOCK_DB_FILE.exists():
+            with open(STOCK_DB_FILE, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                return data.get('stocks', {}), data.get('update_time', 0)
+        return {}, 0
     except Exception as e:
-        st.error(f"获取股票列表失败: {e}")
+        print(f"加载股票数据库失败: {e}")
+        return {}, 0
+
+def save_stock_database(stocks_dict):
+    """保存股票数据库到本地"""
+    try:
+        ensure_db_dir()
+        data = {
+            'stocks': stocks_dict,
+            'update_time': datetime.now().timestamp()
+        }
+        with open(STOCK_DB_FILE, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        return True
+    except Exception as e:
+        print(f"保存股票数据库失败: {e}")
+        return False
+
+def update_stock_database():
+    """从网络更新股票数据库"""
+    try:
+        stock_list = ak.stock_zh_a_spot_em()
+        stocks_dict = {}
+        for _, row in stock_list.iterrows():
+            code = str(row['代码'])
+            name = str(row['名称'])
+            stocks_dict[code] = name
+        
+        if save_stock_database(stocks_dict):
+            return stocks_dict, datetime.now().timestamp()
+        return {}, 0
+    except Exception as e:
+        print(f"更新股票数据库失败: {e}")
+        return {}, 0
+
+def get_stock_database():
+    """获取股票数据库（自动更新）"""
+    stocks, update_time = load_stock_database()
+    current_time = datetime.now().timestamp()
+    
+    # 如果数据库为空或超过更新间隔，则更新
+    if not stocks or (current_time - update_time) > DB_UPDATE_INTERVAL:
+        new_stocks, new_time = update_stock_database()
+        if new_stocks:
+            return new_stocks, new_time
+    
+    return stocks, update_time
+
+@st.cache_data(ttl=3600)  # 1小时缓存
+def get_cached_stock_database():
+    """获取缓存的股票数据库"""
+    stocks, update_time = get_stock_database()
+    return stocks, update_time
+
+def search_stock_fast(query):
+    """快速搜索股票（使用本地数据库）"""
+    try:
+        stocks, update_time = get_cached_stock_database()
+        
+        if not stocks:
+            # 如果本地数据库为空，回退到在线搜索
+            return search_stock_online(query)
+        
+        query = query.upper()
+        results = []
+        
+        # 搜索代码和名称
+        for code, name in stocks.items():
+            if query in code or query in name:
+                results.append({'代码': code, '名称': name})
+                if len(results) >= 20:  # 限制返回20条
+                    break
+        
+        if results:
+            df = pd.DataFrame(results)
+            return df
+        else:
+            return pd.DataFrame(columns=['代码', '名称'])
+            
+    except Exception as e:
+        st.error(f"搜索失败: {e}")
         return None
 
-def search_stock(query):
-    """搜索股票（使用缓存的股票列表）"""
-    stock_list = get_stock_list()
-    if stock_list is None:
+def search_stock_online(query):
+    """在线搜索股票（备用方案）"""
+    try:
+        stock_list = ak.stock_zh_a_spot_em()
+        query = query.upper()
+        filtered = stock_list[
+            stock_list['代码'].str.contains(query) | 
+            stock_list['名称'].str.contains(query)
+        ].head(20)
+        return filtered[['代码', '名称']]
+    except Exception as e:
+        st.error(f"在线搜索失败: {e}")
         return None
-    
-    query = query.upper()
-    filtered = stock_list[
-        stock_list['代码'].str.contains(query) | 
-        stock_list['名称'].str.contains(query)
-    ].head(20)
-    return filtered
+
+# 兼容旧代码的函数名
+def search_stock(query):
+    """搜索股票（优化版本）"""
+    return search_stock_fast(query)
 
 @st.cache_data(ttl=60)  # 1分钟缓存 - 更实时的市场数据
 def get_market_indices():
@@ -689,11 +794,39 @@ if not check_password():
 with st.sidebar:
     st.header("⚙️ 控制台")
     
+    # 数据库状态显示
+    try:
+        stocks, update_time = get_cached_stock_database()
+        if stocks:
+            update_datetime = datetime.fromtimestamp(update_time)
+            time_diff = datetime.now() - update_datetime
+            hours_ago = int(time_diff.total_seconds() / 3600)
+            
+            with st.expander("📊 股票数据库状态", expanded=False):
+                st.write(f"**股票数量:** {len(stocks):,} 只")
+                st.write(f"**更新时间:** {update_datetime.strftime('%Y-%m-%d %H:%M')}")
+                st.write(f"**距今:** {hours_ago} 小时前")
+                
+                if st.button("🔄 手动刷新数据库", use_container_width=True):
+                    with st.spinner("正在更新股票数据库..."):
+                        new_stocks, new_time = update_stock_database()
+                        if new_stocks:
+                            st.cache_data.clear()
+                            st.success(f"✅ 已更新 {len(new_stocks):,} 只股票数据")
+                            st.rerun()
+                        else:
+                            st.error("❌ 更新失败，请稍后重试")
+        else:
+            st.info("📥 首次使用，正在初始化股票数据库...")
+    except Exception as e:
+        st.warning(f"⚠️ 数据库状态获取失败")
+    
+    st.divider()
+    
     # 股票搜索
-    search_query = st.text_input("🔍 搜索股票", placeholder="输入代码或名称（至少2个字符）...")
-    if search_query and len(search_query) >= 2:  # 至少2个字符才搜索
-        with st.spinner('搜索中...'):
-            search_results = search_stock(search_query)
+    search_query = st.text_input("🔍 搜索股票", placeholder="输入代码或名称...")
+    if search_query:
+        search_results = search_stock(search_query)
         if search_results is not None and not search_results.empty:
             selected = st.selectbox(
                 "选择股票",
@@ -940,6 +1073,6 @@ else:
 st.divider()
 col_footer1, col_footer2 = st.columns([3, 1])
 with col_footer1:
-    st.caption("💡 数据来源: AKShare (东方财富) | 缓存时间: 5分钟 | 本平台仅供学习参考，不构成投资建议")
+    st.caption("💡 数据来源: 网络")
 with col_footer2:
     st.caption(f"⏰ 当前时间: {datetime.now().strftime('%H:%M:%S')}")
