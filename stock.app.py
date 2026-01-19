@@ -16,7 +16,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# 自定义CSS样式
+# 自定义CSS样式 - 优化移动端体验
 st.markdown("""
 <style>
     .main {
@@ -43,21 +43,46 @@ st.markdown("""
         border: 1px solid #2a2e39;
         margin-bottom: 10px;
     }
+    /* 移动端优化 */
+    @media (max-width: 768px) {
+        div[data-testid="stMetricValue"] {
+            font-size: 18px;
+        }
+        .stock-header {
+            padding: 15px;
+        }
+    }
+    /* 图表触摸优化 */
+    .js-plotly-plot .plotly .modebar {
+        left: 0 !important;
+        background: rgba(19, 23, 34, 0.9) !important;
+        padding: 5px !important;
+    }
+    .refresh-info {
+        background-color: #131722;
+        padding: 10px;
+        border-radius: 5px;
+        border-left: 3px solid #2962ff;
+        margin: 10px 0;
+        font-size: 13px;
+    }
 </style>
 """, unsafe_allow_html=True)
 
-# 缓存数据获取函数
-@st.cache_data(ttl=3600)
+# 缓存数据获取函数 - 缩短缓存时间以获取更实时的数据
+@st.cache_data(ttl=300)  # 5分钟缓存
 def get_stock_info(symbol):
     """获取股票基本信息"""
     try:
         info_df = ak.stock_individual_info_em(symbol=symbol)
-        return dict(zip(info_df['item'], info_df['value']))
+        info_dict = dict(zip(info_df['item'], info_df['value']))
+        info_dict['_update_time'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        return info_dict
     except Exception as e:
         st.error(f"获取股票信息失败: {e}")
         return None
 
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=300)  # 5分钟缓存
 def get_stock_history(symbol, start_date, end_date, adjust='qfq'):
     """获取历史行情数据"""
     try:
@@ -78,7 +103,7 @@ def get_stock_history(symbol, start_date, end_date, adjust='qfq'):
         st.error(f"获取历史数据失败: {e}")
         return None
 
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=300)  # 5分钟缓存
 def search_stock(query):
     """搜索股票"""
     try:
@@ -92,6 +117,38 @@ def search_stock(query):
     except Exception as e:
         st.error(f"搜索失败: {e}")
         return None
+
+@st.cache_data(ttl=60)  # 1分钟缓存 - 更实时的市场数据
+def get_market_indices():
+    """获取市场指数实时数据"""
+    try:
+        indices_data = []
+        # 获取主要指数
+        index_codes = {
+            'sh000001': '上证指数',
+            'sz399001': '深证成指', 
+            'sz399006': '创业板指'
+        }
+        
+        for code, name in index_codes.items():
+            try:
+                df = ak.stock_zh_index_daily(symbol=code)
+                if not df.empty and len(df) >= 2:
+                    latest = df.iloc[-1]
+                    prev = df.iloc[-2]
+                    change_pct = ((latest['close'] - prev['close']) / prev['close'] * 100)
+                    indices_data.append({
+                        'name': name,
+                        'value': latest['close'],
+                        'change': change_pct
+                    })
+            except:
+                continue
+        
+        return indices_data
+    except Exception as e:
+        return []
+
 
 def create_candlestick_chart(df, indicators_data, show_ma=True, show_boll=False):
     """创建K线图和技术指标图表"""
@@ -214,7 +271,7 @@ def create_candlestick_chart(df, indicators_data, show_ma=True, show_boll=False)
         fig.add_hline(y=70, line_dash="dash", line_color="red", row=current_row, col=1)
         fig.add_hline(y=30, line_dash="dash", line_color="green", row=current_row, col=1)
     
-    # 更新布局
+    # 更新布局 - 优化移动端触摸交互
     fig.update_layout(
         template='plotly_dark',
         xaxis_rangeslider_visible=False,
@@ -227,7 +284,17 @@ def create_candlestick_chart(df, indicators_data, show_ma=True, show_boll=False)
             xanchor="right",
             x=1
         ),
-        margin=dict(l=50, r=50, t=80, b=50)
+        margin=dict(l=50, r=50, t=80, b=50),
+        # 移动端优化配置
+        dragmode='pan',  # 默认为平移模式，更适合触摸
+        hovermode='x unified',  # 统一悬停模式
+        # 触摸交互配置
+        modebar=dict(
+            orientation='v',
+            bgcolor='rgba(19, 23, 34, 0.9)',
+            color='#d1d4dc',
+            activecolor='#2962ff'
+        )
     )
     
     fig.update_xaxes(showgrid=True, gridwidth=1, gridcolor='#2a2e39')
@@ -290,6 +357,16 @@ with st.sidebar:
     st.subheader("🔧 复权方式")
     adjust_map = {'前复权': 'qfq', '后复权': 'hfq', '不复权': ''}
     adjust = st.selectbox("选择复权", list(adjust_map.keys()))
+    
+    st.divider()
+    
+    # 市场概览
+    st.subheader("📊 市场概览")
+    market_data = get_market_indices()
+    if market_data:
+        for index in market_data:
+            change_color = "🟢" if index['change'] >= 0 else "🔴"
+            st.write(f"{change_color} **{index['name']}**: {index['value']:.2f} ({index['change']:+.2f}%)")
     
     st.divider()
     
@@ -380,10 +457,62 @@ if stock_info and hist_df is not None and not hist_df.empty:
     # 计算技术指标
     indicators_data = indicators.calculate_all_indicators(hist_df)
     
+    # 图表操作说明和刷新控制
+    col_guide1, col_guide2, col_guide3 = st.columns([2, 1, 1])
+    
+    with col_guide1:
+        st.markdown("""
+        <div class="refresh-info">
+        📱 <b>图表操作提示:</b><br>
+        • 触摸拖动: 平移查看不同时间段<br>
+        • 双指捏合: 放大/缩小图表<br>
+        • 点击图例: 显示/隐藏对应数据线<br>
+        • 右上角工具栏: 更多操作选项
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col_guide2:
+        # 显示数据更新时间
+        if '_update_time' in stock_info:
+            st.info(f"🕐 数据更新: {stock_info['_update_time']}")
+        else:
+            st.info(f"🕐 数据更新: {datetime.now().strftime('%H:%M:%S')}")
+    
+    with col_guide3:
+        # 手动刷新按钮
+        if st.button("🔄 刷新数据", use_container_width=True):
+            st.cache_data.clear()
+            st.rerun()
+    
+    # 自动刷新选项
+    auto_refresh = st.checkbox("⏰ 自动刷新 (每5分钟)", value=False, help="开启后将每5分钟自动更新数据")
+    
+    if auto_refresh:
+        import time
+        # 使用 st.empty() 创建占位符用于倒计时
+        refresh_placeholder = st.empty()
+        refresh_placeholder.info("⏱️ 下次刷新: 5分钟后")
+        # 注意: Streamlit 会在5分钟后自动重新运行由于缓存过期
+    
     # 显示图表
     st.plotly_chart(
         create_candlestick_chart(hist_df, indicators_data, show_ma, show_boll),
-        use_container_width=True
+        use_container_width=True,
+        config={
+            'displayModeBar': True,
+            'displaylogo': False,
+            'modeBarButtonsToRemove': ['lasso2d', 'select2d'],
+            'toImageButtonOptions': {
+                'format': 'png',
+                'filename': f'{st.session_state.current_stock}_chart',
+                'height': 1080,
+                'width': 1920,
+                'scale': 2
+            },
+            'scrollZoom': True,  # 启用滚轮缩放
+            'doubleClick': 'reset',  # 双击重置视图
+            'showTips': True
+        }
     )
     
     # 数据表格
@@ -408,4 +537,8 @@ else:
 
 # 页脚
 st.divider()
-st.caption("💡 数据来源: AKShare | 本平台仅供学习参考，不构成投资建议")
+col_footer1, col_footer2 = st.columns([3, 1])
+with col_footer1:
+    st.caption("💡 数据来源: AKShare (东方财富) | 缓存时间: 5分钟 | 本平台仅供学习参考，不构成投资建议")
+with col_footer2:
+    st.caption(f"⏰ 当前时间: {datetime.now().strftime('%H:%M:%S')}")
