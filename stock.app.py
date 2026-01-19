@@ -66,7 +66,197 @@ st.markdown("""
         margin: 10px 0;
         font-size: 13px;
     }
+    
+    /* 全屏模式样式 */
+    .chart-fullscreen-container:fullscreen {
+        background-color: #0a0e27;
+        padding: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .chart-fullscreen-container:-webkit-full-screen {
+        background-color: #0a0e27;
+        padding: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .chart-fullscreen-container:-moz-full-screen {
+        background-color: #0a0e27;
+        padding: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    .chart-fullscreen-container:-ms-fullscreen {
+        background-color: #0a0e27;
+        padding: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    /* 全屏时图表占满整个屏幕 */
+    .chart-fullscreen-container:fullscreen .js-plotly-plot,
+    .chart-fullscreen-container:-webkit-full-screen .js-plotly-plot,
+    .chart-fullscreen-container:-moz-full-screen .js-plotly-plot {
+        width: 100% !important;
+        height: 100% !important;
+    }
 </style>
+
+<script>
+// 移动端全屏横屏功能
+(function() {
+    // 检测是否为移动设备
+    function isMobileDevice() {
+        return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+               (navigator.maxTouchPoints && navigator.maxTouchPoints > 2);
+    }
+    
+    // 全屏切换函数
+    function toggleFullscreen(element) {
+        if (!document.fullscreenElement && 
+            !document.webkitFullscreenElement && 
+            !document.mozFullScreenElement && 
+            !document.msFullscreenElement) {
+            // 进入全屏
+            if (element.requestFullscreen) {
+                element.requestFullscreen();
+            } else if (element.webkitRequestFullscreen) {
+                element.webkitRequestFullscreen();
+            } else if (element.mozRequestFullScreen) {
+                element.mozRequestFullScreen();
+            } else if (element.msRequestFullscreen) {
+                element.msRequestFullscreen();
+            }
+        } else {
+            // 退出全屏
+            if (document.exitFullscreen) {
+                document.exitFullscreen();
+            } else if (document.webkitExitFullscreen) {
+                document.webkitExitFullscreen();
+            } else if (document.mozCancelFullScreen) {
+                document.mozCancelFullScreen();
+            } else if (document.msExitFullscreen) {
+                document.msExitFullscreen();
+            }
+        }
+    }
+    
+    // 锁定横屏
+    async function lockLandscape() {
+        if (isMobileDevice() && screen.orientation && screen.orientation.lock) {
+            try {
+                await screen.orientation.lock('landscape');
+                console.log('屏幕已锁定为横屏模式');
+            } catch (error) {
+                console.log('无法锁定屏幕方向:', error);
+            }
+        }
+    }
+    
+    // 解锁屏幕方向
+    function unlockOrientation() {
+        if (screen.orientation && screen.orientation.unlock) {
+            try {
+                screen.orientation.unlock();
+                console.log('屏幕方向已解锁');
+            } catch (error) {
+                console.log('解锁屏幕方向失败:', error);
+            }
+        }
+    }
+    
+    // 监听全屏变化
+    function handleFullscreenChange() {
+        const isFullscreen = !!(document.fullscreenElement || 
+                               document.webkitFullscreenElement || 
+                               document.mozFullScreenElement || 
+                               document.msFullscreenElement);
+        
+        if (isFullscreen) {
+            // 进入全屏时锁定横屏
+            lockLandscape();
+        } else {
+            // 退出全屏时解锁方向
+            unlockOrientation();
+        }
+    }
+    
+    // 添加全屏事件监听
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+    document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+    document.addEventListener('MSFullscreenChange', handleFullscreenChange);
+    
+    // 为Plotly图表添加全屏功能
+    function initChartFullscreen() {
+        // 等待Plotly图表加载
+        setTimeout(function() {
+            const plotlyCharts = document.querySelectorAll('.js-plotly-plot');
+            plotlyCharts.forEach(function(chart, index) {
+                // 为每个图表创建包装容器
+                if (!chart.parentElement.classList.contains('chart-fullscreen-container')) {
+                    const wrapper = document.createElement('div');
+                    wrapper.className = 'chart-fullscreen-container';
+                    wrapper.id = 'chart-fullscreen-' + index;
+                    chart.parentNode.insertBefore(wrapper, chart);
+                    wrapper.appendChild(chart);
+                    
+                    // 添加自定义全屏按钮到Plotly工具栏
+                    const modebar = chart.querySelector('.modebar');
+                    if (modebar) {
+                        const fullscreenBtn = document.createElement('a');
+                        fullscreenBtn.className = 'modebar-btn';
+                        fullscreenBtn.setAttribute('data-title', '全屏显示' + (isMobileDevice() ? '(横屏)' : ''));
+                        fullscreenBtn.innerHTML = '<svg viewBox="0 0 1000 1000" class="icon"><path d="M250 200h-50q-21 0-35.5 14.5t-14.5 35.5v50q0 21 14.5 35.5t35.5 14.5 35.5-14.5 14.5-35.5v-50h50q21 0 35.5-14.5t14.5-35.5-14.5-35.5-35.5-14.5zm-50 600h50q21 0 35.5-14.5t14.5-35.5-14.5-35.5-35.5-14.5h-50v-50q0-21-14.5-35.5t-35.5-14.5-35.5 14.5-14.5 35.5v50q0 21 14.5 35.5t35.5 14.5zm600 0h50q21 0 35.5-14.5t14.5-35.5v-50q0-21-14.5-35.5t-35.5-14.5-35.5 14.5-14.5 35.5v50h-50q-21 0-35.5 14.5t-14.5 35.5 14.5 35.5 35.5 14.5zm50-600h-50q-21 0-35.5 14.5t-14.5 35.5 14.5 35.5 35.5 14.5h50v50q0 21 14.5 35.5t35.5 14.5 35.5-14.5 14.5-35.5v-50q0-21-14.5-35.5t-35.5-14.5z"></path></svg>';
+                        fullscreenBtn.style.cursor = 'pointer';
+                        
+                        fullscreenBtn.onclick = function(e) {
+                            e.preventDefault();
+                            toggleFullscreen(wrapper);
+                        };
+                        
+                        // 插入到工具栏
+                        modebar.insertBefore(fullscreenBtn, modebar.firstChild);
+                    }
+                }
+            });
+        }, 1000);
+    }
+    
+    // 页面加载完成后初始化
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initChartFullscreen);
+    } else {
+        initChartFullscreen();
+    }
+    
+    // 监听Streamlit重新渲染
+    window.addEventListener('load', function() {
+        initChartFullscreen();
+    });
+    
+    // 使用MutationObserver监听DOM变化，确保新图表也能获得全屏功能
+    const observer = new MutationObserver(function(mutations) {
+        mutations.forEach(function(mutation) {
+            if (mutation.addedNodes.length) {
+                initChartFullscreen();
+            }
+        });
+    });
+    
+    observer.observe(document.body, {
+        childList: true,
+        subtree: true
+    });
+})();
+</script>
 """, unsafe_allow_html=True)
 
 # ---------------------------------------------------------
