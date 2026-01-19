@@ -1,7 +1,3 @@
-"""
-股票量化分析平台 - Streamlit 版本
-Stock Quantitative Analysis Platform - Streamlit Version
-"""
 import streamlit as st
 import akshare as ak
 import pandas as pd
