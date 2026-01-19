@@ -909,6 +909,6 @@ else:
 st.divider()
 col_footer1, col_footer2 = st.columns([3, 1])
 with col_footer1:
-    st.caption("网络")
+    st.caption("数据来源：网络")
 with col_footer2:
     st.caption(f"⏰ 当前时间: {datetime.now().strftime('%H:%M:%S')}")
