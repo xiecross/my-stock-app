@@ -1,5 +1,42 @@
 import streamlit as st
 import akshare as ak
+# ... (保留之前的 import)
+
+# --- 登录功能逻辑 ---
+def check_password():
+    """如果返回 True，则说明输入了正确的密码。"""
+    def password_entered():
+        """检查用户输入的密码是否与 Secrets 中的一致。"""
+        if st.session_state["password"] == st.secrets["app_password"]:
+            st.session_state["password_correct"] = True
+            del st.session_state["password"]  # 不在 session 中存储密码明文
+        else:
+            st.session_state["password_correct"] = False
+
+    # 初始化状态
+    if "password_correct" not in st.session_state:
+        # 首次打开，显示输入框
+        st.text_input("请输入访问密码", type="password", on_change=password_entered, key="password")
+        return False
+    elif not st.session_state["password_correct"]:
+        # 密码输入错误，再次显示输入框
+        st.text_input("密码错误，请重试", type="password", on_change=password_entered, key="password")
+        st.error("😕 访问受限")
+        return False
+    else:
+        # 密码正确
+        return True
+
+# --- 主程序入口 ---
+if check_password():
+    # 验证通过后，才运行你之前的代码
+    st.sidebar.success("登录成功！")
+    
+    # ... (这里放你之前的全部代码：获取数据、绘图等)
+    st.title("📊 AkShare 金融数据可视化分析")
+    # ...
+import streamlit as st
+import akshare as ak
 import pandas as pd
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
