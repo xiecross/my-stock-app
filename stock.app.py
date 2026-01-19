@@ -455,47 +455,72 @@ def get_stock_history(symbol, start_date, end_date, adjust='qfq'):
         return None
 
 # ---------------------------------------------------------
-# 股票数据库管理 - 内存缓存（适配Streamlit Cloud）
+# 股票数据库管理 - 延迟加载（优化首次加载时间）
 # ---------------------------------------------------------
 
-def load_stock_database_to_session():
-    """加载股票数据库到session_state（仅在会话中执行一次）"""
+def init_stock_database_state():
+    """初始化数据库状态（不加载数据）"""
     if 'stock_database' not in st.session_state:
         st.session_state.stock_database = {}
         st.session_state.stock_db_update_time = 0
+        st.session_state.stock_db_loading = False
+
+def load_stock_database_lazy():
+    """延迟加载股票数据库（仅在需要时加载）"""
+    init_stock_database_state()
     
-    current_time = datetime.now().timestamp()
-    # 如果数据库为空或超过1小时，则更新（Streamlit Cloud环境下缩短更新间隔）
-    if not st.session_state.stock_database or (current_time - st.session_state.stock_db_update_time) > 3600:
-        try:
-            with st.spinner('正在加载股票数据库...'):
-                stock_list = ak.stock_zh_a_spot_em()
-                stocks_dict = {}
-                for _, row in stock_list.iterrows():
-                    code = str(row['代码'])
-                    name = str(row['名称'])
-                    stocks_dict[code] = name
-                
-                st.session_state.stock_database = stocks_dict
-                st.session_state.stock_db_update_time = current_time
-                return stocks_dict, current_time
-        except Exception as e:
-            print(f"更新股票数据库失败: {e}")
-            # 如果更新失败但已有数据，继续使用旧数据
-            if st.session_state.stock_database:
-                return st.session_state.stock_database, st.session_state.stock_db_update_time
-            return {}, 0
+    # 如果数据库已有数据，直接返回
+    if st.session_state.stock_database:
+        current_time = datetime.now().timestamp()
+        # 检查是否需要更新（超过1小时）
+        if (current_time - st.session_state.stock_db_update_time) > 3600:
+            # 需要更新，但不阻塞，返回旧数据
+            return st.session_state.stock_database, st.session_state.stock_db_update_time, False
+        return st.session_state.stock_database, st.session_state.stock_db_update_time, True
     
-    return st.session_state.stock_database, st.session_state.stock_db_update_time
+    # 数据库为空，需要加载
+    return {}, 0, False
+
+def load_stock_database_now():
+    """立即加载股票数据库"""
+    try:
+        # 只获取代码和名称，减少数据量
+        stock_list = ak.stock_zh_a_spot_em()
+        stocks_dict = {}
+        
+        # 只保留代码和名称
+        for _, row in stock_list[['代码', '名称']].iterrows():
+            code = str(row['代码'])
+            name = str(row['名称'])
+            stocks_dict[code] = name
+        
+        st.session_state.stock_database = stocks_dict
+        st.session_state.stock_db_update_time = datetime.now().timestamp()
+        st.session_state.stock_db_loading = False
+        
+        return stocks_dict, st.session_state.stock_db_update_time
+    except Exception as e:
+        st.session_state.stock_db_loading = False
+        print(f"加载股票数据库失败: {e}")
+        return {}, 0
 
 def search_stock_fast(query):
-    """快速搜索股票（使用内存数据库）"""
+    """快速搜索股票（延迟加载）"""
     try:
-        stocks, update_time = load_stock_database_to_session()
+        stocks, update_time, is_loaded = load_stock_database_lazy()
         
+        # 如果数据库未加载，显示加载提示并加载
         if not stocks:
-            # 如果数据库为空，回退到在线搜索
-            return search_stock_online(query)
+            if not st.session_state.stock_db_loading:
+                st.session_state.stock_db_loading = True
+                with st.spinner('🔄 首次使用，正在加载股票数据库...'):
+                    stocks, update_time = load_stock_database_now()
+                    if not stocks:
+                        # 加载失败，回退到在线搜索
+                        return search_stock_online(query)
+            else:
+                st.info("⏳ 数据库正在加载中，请稍候...")
+                return pd.DataFrame(columns=['代码', '名称'])
         
         query = query.upper()
         results = []
@@ -508,8 +533,7 @@ def search_stock_fast(query):
                     break
         
         if results:
-            df = pd.DataFrame(results)
-            return df
+            return pd.DataFrame(results)
         else:
             return pd.DataFrame(columns=['代码', '名称'])
             
@@ -533,20 +557,19 @@ def search_stock_online(query):
 
 def force_refresh_stock_database():
     """强制刷新股票数据库"""
+    st.session_state.stock_db_loading = True
     try:
-        stock_list = ak.stock_zh_a_spot_em()
-        stocks_dict = {}
-        for _, row in stock_list.iterrows():
-            code = str(row['代码'])
-            name = str(row['名称'])
-            stocks_dict[code] = name
-        
-        st.session_state.stock_database = stocks_dict
-        st.session_state.stock_db_update_time = datetime.now().timestamp()
-        return stocks_dict, st.session_state.stock_db_update_time
+        stocks_dict, update_time = load_stock_database_now()
+        return stocks_dict, update_time
     except Exception as e:
+        st.session_state.stock_db_loading = False
         st.error(f"刷新失败: {e}")
         return {}, 0
+
+def get_database_status():
+    """获取数据库状态（不触发加载）"""
+    init_stock_database_state()
+    return st.session_state.stock_database, st.session_state.stock_db_update_time
 
 # 兼容旧代码的函数名
 def search_stock(query):
@@ -768,7 +791,7 @@ with st.sidebar:
     
     # 数据库状态显示
     try:
-        stocks, update_time = load_stock_database_to_session()
+        stocks, update_time = get_database_status()
         if stocks:
             update_datetime = datetime.fromtimestamp(update_time)
             time_diff = datetime.now() - update_datetime
@@ -783,7 +806,7 @@ with st.sidebar:
                     hours_ago = int(minutes_ago / 60)
                     st.write(f"**距今:** {hours_ago} 小时前")
                 
-                st.caption("💡 数据库存储在会话内存中，每小时自动更新")
+                st.caption("💡 延迟加载：首次搜索时自动加载，每小时自动更新")
                 
                 if st.button("🔄 手动刷新数据库", use_container_width=True):
                     with st.spinner("正在更新股票数据库..."):
@@ -794,7 +817,7 @@ with st.sidebar:
                         else:
                             st.error("❌ 更新失败，请稍后重试")
         else:
-            st.info("📥 首次使用，正在初始化股票数据库...")
+            st.caption("� 数据库将在首次搜索时自动加载")
     except Exception as e:
         st.warning(f"⚠️ 数据库状态获取失败")
     
@@ -1050,6 +1073,6 @@ else:
 st.divider()
 col_footer1, col_footer2 = st.columns([3, 1])
 with col_footer1:
-    st.caption("💡 数据来源: 网络")
+    st.caption("💡 数据来源: AKShare (东方财富) | 缓存时间: 5分钟 | 本平台仅供学习参考，不构成投资建议")
 with col_footer2:
     st.caption(f"⏰ 当前时间: {datetime.now().strftime('%H:%M:%S')}")
