@@ -658,6 +658,15 @@ if 'current_stock' not in st.session_state:
     st.session_state.current_stock = '600519'
 if 'active_indicators' not in st.session_state:
     st.session_state.active_indicators = {'macd', 'kdj', 'rsi'}
+if 'watchlist' not in st.session_state:
+    # 默认自选股
+    st.session_state.watchlist = {
+        '600519': '贵州茅台',
+        '000001': '平安银行',
+        '000858': '五粮液',
+        '601318': '中国平安',
+        '600036': '招商银行'
+    }
 
 # ---------------------------------------------------------
 # 密码验证 - 只有通过验证才显示主应用
@@ -683,26 +692,40 @@ with st.sidebar:
                 search_results['代码'].tolist(),
                 format_func=lambda x: f"{x} - {search_results[search_results['代码']==x]['名称'].values[0]}"
             )
-            if st.button("加载该股票"):
-                st.session_state.current_stock = selected
-                st.rerun()
+            col_load, col_add = st.columns(2)
+            with col_load:
+                if st.button("📊 加载", use_container_width=True):
+                    st.session_state.current_stock = selected
+                    st.rerun()
+            with col_add:
+                selected_name = search_results[search_results['代码']==selected]['名称'].values[0]
+                if selected not in st.session_state.watchlist:
+                    if st.button("⭐ 添加", use_container_width=True):
+                        st.session_state.watchlist[selected] = selected_name
+                        st.success(f"已添加 {selected} {selected_name} 到自选股")
+                        st.rerun()
+                else:
+                    st.button("✓ 已添加", disabled=True, use_container_width=True)
     
     st.divider()
     
     # 自选股
     st.subheader("📋 自选股")
-    watchlist = {
-        '600519': '贵州茅台',
-        '000001': '平安银行',
-        '000858': '五粮液',
-        '601318': '中国平安',
-        '600036': '招商银行'
-    }
     
-    for code, name in watchlist.items():
-        if st.button(f"{code} {name}", key=f"watch_{code}", use_container_width=True):
-            st.session_state.current_stock = code
-            st.rerun()
+    if st.session_state.watchlist:
+        for code, name in st.session_state.watchlist.items():
+            col1, col2 = st.columns([4, 1])
+            with col1:
+                if st.button(f"{code} {name}", key=f"watch_{code}", use_container_width=True):
+                    st.session_state.current_stock = code
+                    st.rerun()
+            with col2:
+                if st.button("🗑️", key=f"del_{code}", use_container_width=True, help="删除自选股"):
+                    del st.session_state.watchlist[code]
+                    st.success(f"已删除 {code} {name}")
+                    st.rerun()
+    else:
+        st.info("暂无自选股，请通过搜索添加")
     
     st.divider()
     
@@ -909,6 +932,6 @@ else:
 st.divider()
 col_footer1, col_footer2 = st.columns([3, 1])
 with col_footer1:
-    st.caption("数据来源：网络")
+    st.caption("💡 数据来源: AKShare (东方财富) | 缓存时间: 5分钟 | 本平台仅供学习参考，不构成投资建议")
 with col_footer2:
     st.caption(f"⏰ 当前时间: {datetime.now().strftime('%H:%M:%S')}")
