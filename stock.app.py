@@ -455,91 +455,46 @@ def get_stock_history(symbol, start_date, end_date, adjust='qfq'):
         return None
 
 # ---------------------------------------------------------
-# 股票数据库管理 - 本地缓存加速搜索
+# 股票数据库管理 - 内存缓存（适配Streamlit Cloud）
 # ---------------------------------------------------------
-import json
-import os
-from pathlib import Path
 
-# 数据库文件路径
-DB_DIR = Path(__file__).parent / 'data'
-STOCK_DB_FILE = DB_DIR / 'stock_list.json'
-DB_UPDATE_INTERVAL = 86400  # 24小时更新一次
-
-def ensure_db_dir():
-    """确保数据目录存在"""
-    DB_DIR.mkdir(exist_ok=True)
-
-def load_stock_database():
-    """从本地加载股票数据库"""
-    try:
-        if STOCK_DB_FILE.exists():
-            with open(STOCK_DB_FILE, 'r', encoding='utf-8') as f:
-                data = json.load(f)
-                return data.get('stocks', {}), data.get('update_time', 0)
-        return {}, 0
-    except Exception as e:
-        print(f"加载股票数据库失败: {e}")
-        return {}, 0
-
-def save_stock_database(stocks_dict):
-    """保存股票数据库到本地"""
-    try:
-        ensure_db_dir()
-        data = {
-            'stocks': stocks_dict,
-            'update_time': datetime.now().timestamp()
-        }
-        with open(STOCK_DB_FILE, 'w', encoding='utf-8') as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
-        return True
-    except Exception as e:
-        print(f"保存股票数据库失败: {e}")
-        return False
-
-def update_stock_database():
-    """从网络更新股票数据库"""
-    try:
-        stock_list = ak.stock_zh_a_spot_em()
-        stocks_dict = {}
-        for _, row in stock_list.iterrows():
-            code = str(row['代码'])
-            name = str(row['名称'])
-            stocks_dict[code] = name
-        
-        if save_stock_database(stocks_dict):
-            return stocks_dict, datetime.now().timestamp()
-        return {}, 0
-    except Exception as e:
-        print(f"更新股票数据库失败: {e}")
-        return {}, 0
-
-def get_stock_database():
-    """获取股票数据库（自动更新）"""
-    stocks, update_time = load_stock_database()
+def load_stock_database_to_session():
+    """加载股票数据库到session_state（仅在会话中执行一次）"""
+    if 'stock_database' not in st.session_state:
+        st.session_state.stock_database = {}
+        st.session_state.stock_db_update_time = 0
+    
     current_time = datetime.now().timestamp()
+    # 如果数据库为空或超过1小时，则更新（Streamlit Cloud环境下缩短更新间隔）
+    if not st.session_state.stock_database or (current_time - st.session_state.stock_db_update_time) > 3600:
+        try:
+            with st.spinner('正在加载股票数据库...'):
+                stock_list = ak.stock_zh_a_spot_em()
+                stocks_dict = {}
+                for _, row in stock_list.iterrows():
+                    code = str(row['代码'])
+                    name = str(row['名称'])
+                    stocks_dict[code] = name
+                
+                st.session_state.stock_database = stocks_dict
+                st.session_state.stock_db_update_time = current_time
+                return stocks_dict, current_time
+        except Exception as e:
+            print(f"更新股票数据库失败: {e}")
+            # 如果更新失败但已有数据，继续使用旧数据
+            if st.session_state.stock_database:
+                return st.session_state.stock_database, st.session_state.stock_db_update_time
+            return {}, 0
     
-    # 如果数据库为空或超过更新间隔，则更新
-    if not stocks or (current_time - update_time) > DB_UPDATE_INTERVAL:
-        new_stocks, new_time = update_stock_database()
-        if new_stocks:
-            return new_stocks, new_time
-    
-    return stocks, update_time
-
-@st.cache_data(ttl=3600)  # 1小时缓存
-def get_cached_stock_database():
-    """获取缓存的股票数据库"""
-    stocks, update_time = get_stock_database()
-    return stocks, update_time
+    return st.session_state.stock_database, st.session_state.stock_db_update_time
 
 def search_stock_fast(query):
-    """快速搜索股票（使用本地数据库）"""
+    """快速搜索股票（使用内存数据库）"""
     try:
-        stocks, update_time = get_cached_stock_database()
+        stocks, update_time = load_stock_database_to_session()
         
         if not stocks:
-            # 如果本地数据库为空，回退到在线搜索
+            # 如果数据库为空，回退到在线搜索
             return search_stock_online(query)
         
         query = query.upper()
@@ -575,6 +530,23 @@ def search_stock_online(query):
     except Exception as e:
         st.error(f"在线搜索失败: {e}")
         return None
+
+def force_refresh_stock_database():
+    """强制刷新股票数据库"""
+    try:
+        stock_list = ak.stock_zh_a_spot_em()
+        stocks_dict = {}
+        for _, row in stock_list.iterrows():
+            code = str(row['代码'])
+            name = str(row['名称'])
+            stocks_dict[code] = name
+        
+        st.session_state.stock_database = stocks_dict
+        st.session_state.stock_db_update_time = datetime.now().timestamp()
+        return stocks_dict, st.session_state.stock_db_update_time
+    except Exception as e:
+        st.error(f"刷新失败: {e}")
+        return {}, 0
 
 # 兼容旧代码的函数名
 def search_stock(query):
@@ -796,22 +768,27 @@ with st.sidebar:
     
     # 数据库状态显示
     try:
-        stocks, update_time = get_cached_stock_database()
+        stocks, update_time = load_stock_database_to_session()
         if stocks:
             update_datetime = datetime.fromtimestamp(update_time)
             time_diff = datetime.now() - update_datetime
-            hours_ago = int(time_diff.total_seconds() / 3600)
+            minutes_ago = int(time_diff.total_seconds() / 60)
             
             with st.expander("📊 股票数据库状态", expanded=False):
                 st.write(f"**股票数量:** {len(stocks):,} 只")
                 st.write(f"**更新时间:** {update_datetime.strftime('%Y-%m-%d %H:%M')}")
-                st.write(f"**距今:** {hours_ago} 小时前")
+                if minutes_ago < 60:
+                    st.write(f"**距今:** {minutes_ago} 分钟前")
+                else:
+                    hours_ago = int(minutes_ago / 60)
+                    st.write(f"**距今:** {hours_ago} 小时前")
+                
+                st.caption("💡 数据库存储在会话内存中，每小时自动更新")
                 
                 if st.button("🔄 手动刷新数据库", use_container_width=True):
                     with st.spinner("正在更新股票数据库..."):
-                        new_stocks, new_time = update_stock_database()
+                        new_stocks, new_time = force_refresh_stock_database()
                         if new_stocks:
-                            st.cache_data.clear()
                             st.success(f"✅ 已更新 {len(new_stocks):,} 只股票数据")
                             st.rerun()
                         else:
