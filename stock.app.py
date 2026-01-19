@@ -67,7 +67,7 @@ st.markdown("""
         font-size: 13px;
     }
     
-    /* 全屏模式样式 */
+    /* 全屏模式样式 - 深色主题（默认） */
     .chart-fullscreen-container:fullscreen {
         background-color: #0a0e27;
         padding: 20px;
@@ -98,6 +98,44 @@ st.markdown("""
         display: flex;
         align-items: center;
         justify-content: center;
+    }
+    
+    /* 浅色主题适配 */
+    @media (prefers-color-scheme: light) {
+        .chart-fullscreen-container:fullscreen {
+            background-color: #f5f5f5;
+        }
+        
+        .chart-fullscreen-container:-webkit-full-screen {
+            background-color: #f5f5f5;
+        }
+        
+        .chart-fullscreen-container:-moz-full-screen {
+            background-color: #f5f5f5;
+        }
+        
+        .chart-fullscreen-container:-ms-fullscreen {
+            background-color: #f5f5f5;
+        }
+    }
+    
+    /* 深色主题适配（显式声明） */
+    @media (prefers-color-scheme: dark) {
+        .chart-fullscreen-container:fullscreen {
+            background-color: #0a0e27;
+        }
+        
+        .chart-fullscreen-container:-webkit-full-screen {
+            background-color: #0a0e27;
+        }
+        
+        .chart-fullscreen-container:-moz-full-screen {
+            background-color: #0a0e27;
+        }
+        
+        .chart-fullscreen-container:-ms-fullscreen {
+            background-color: #0a0e27;
+        }
     }
     
     /* 全屏时图表占满整个屏幕 */
@@ -801,6 +839,6 @@ else:
 st.divider()
 col_footer1, col_footer2 = st.columns([3, 1])
 with col_footer1:
-    st.caption("💡 数据来源: AKShare (东方财富) | 缓存时间: 5分钟 | 本平台仅供学习参考，不构成投资建议")
+    st.caption("💡 数据来源: 网络")
 with col_footer2:
     st.caption(f"⏰ 当前时间: {datetime.now().strftime('%H:%M:%S')}")
