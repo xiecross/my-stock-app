@@ -7,22 +7,31 @@ from plotly.subplots import make_subplots
 import datetime
 
 # ---------------------------------------------------------
-# 1. 登录验证逻辑
+# 1. 登录验证逻辑 (增强版：支持 URL 参数自动登录)
 # ---------------------------------------------------------
 def check_password():
-    """Returns True if the user has entered the correct password."""
+    """返回 True 表示验证通过，支持 URL 参数持久化"""
+
+    # 检查 URL 中是否已经携带了正确的“持久化”凭证
+    # 例如：你的网址/?auth=correct_password
+    if st.query_params.get("auth") == st.secrets["app_password"]:
+        st.session_state["password_correct"] = True
+        return True
 
     def password_entered():
-        """Checks whether a password entered by the user is correct."""
+        """检查用户输入的密码"""
         if st.session_state["password"] == st.secrets["app_password"]:
             st.session_state["password_correct"] = True
-            del st.session_state["password"]  # Clear password from session state
+            # 登录成功后，将密码写入 URL 参数中，这样刷新页面时可以自动读取
+            st.query_params["auth"] = st.secrets["app_password"]
+            del st.session_state["password"] 
         else:
             st.session_state["password_correct"] = False
 
     if "password_correct" not in st.session_state:
         st.title("🔒 访问受限")
         st.text_input("请输入访问密码", type="password", on_change=password_entered, key="password")
+        st.info("提示：登录成功后，URL 会记录状态，下次刷新无需重新输入。")
         return False
     elif not st.session_state["password_correct"]:
         st.title("🔒 访问受限")
@@ -101,6 +110,8 @@ if check_password():
     
     if st.sidebar.button("登出账户"):
         st.session_state["password_correct"] = False
+        # 登出时清除 URL 参数
+        st.query_params.clear()
         st.rerun()
 
     st.title("📊 AkShare 增强量化看板")
@@ -113,7 +124,10 @@ if check_password():
     start_date = col_date1.date_input("开始日期", datetime.date.today() - datetime.timedelta(days=365))
     end_date = col_date2.date_input("结束日期", datetime.date.today())
     
-    adjust_type = st.sidebar.selectbox("复权方式", ["qfq", "hfq", "None"])
+    # 复权方式处理
+    adj_map = {"前复权": "qfq", "后复权": "hfq", "不复权": "None"}
+    adjust_display = st.sidebar.selectbox("复权方式", list(adj_map.keys()))
+    adjust_type = adj_map[adjust_display]
     
     st.sidebar.markdown("---")
     st.sidebar.header("⚙️ 指标开关")
