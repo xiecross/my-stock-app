@@ -455,35 +455,88 @@ def get_stock_history(symbol, start_date, end_date, adjust='qfq'):
         return None
 
 # ---------------------------------------------------------
-# 股票搜索优化 - 按需搜索 + 智能缓存
+# 股票搜索 - 懒加载策略（充分利用akshare）
 # ---------------------------------------------------------
 
-@st.cache_data(ttl=300)  # 5分钟缓存搜索结果
-def search_stock_cached(query):
-    """缓存的股票搜索（避免重复API调用）"""
+@st.cache_data(ttl=3600)  # 缓存1小时
+def get_all_stocks_cached():
+    """获取所有股票列表（带缓存）- 仅在需要时调用"""
     try:
         stock_list = ak.stock_zh_a_spot_em()
-        query = query.upper()
-        filtered = stock_list[
-            stock_list['代码'].str.contains(query) | 
-            stock_list['名称'].str.contains(query)
-        ].head(20)
-        return filtered[['代码', '名称']]
+        stocks_dict = {}
+        for _, row in stock_list.iterrows():
+            code = str(row['代码'])
+            name = str(row['名称'])
+            stocks_dict[code] = name
+        return stocks_dict
     except Exception as e:
-        st.error(f"搜索失败: {e}")
-        return None
+        print(f"获取股票列表失败: {e}")
+        return {}
 
 def search_stock(query):
     """
-    优化的股票搜索
-    - 使用Streamlit缓存避免重复API调用
-    - 相同查询5分钟内直接返回缓存结果
-    - 不同查询才会触发新的API调用
+    智能搜索股票
+    - 首次搜索时加载完整列表并缓存
+    - 后续搜索使用缓存数据，速度极快
+    - 充分利用akshare的实时数据
     """
     if not query or len(query.strip()) == 0:
         return None
     
-    return search_stock_cached(query.strip())
+    try:
+        # 懒加载：只在实际搜索时才获取数据
+        stocks = get_all_stocks_cached()
+        
+        if not stocks:
+            st.warning("⚠️ 无法加载股票数据，请检查网络连接")
+            return None
+        
+        query = query.upper().strip()
+        results = []
+        
+        # 快速搜索代码和名称
+        for code, name in stocks.items():
+            if query in code or query in name:
+                results.append({'代码': code, '名称': name})
+                if len(results) >= 20:  # 限制返回20条
+                    break
+        
+        if results:
+            return pd.DataFrame(results)
+        else:
+            return pd.DataFrame(columns=['代码', '名称'])
+            
+    except Exception as e:
+        st.error(f"搜索失败: {e}")
+        return None
+
+def get_stock_db_info():
+    """获取股票数据库信息（用于状态显示）"""
+    try:
+        # 检查缓存是否存在
+        cache_data = st.cache_data.get_stats()
+        stocks = get_all_stocks_cached()
+        
+        if stocks:
+            return {
+                'count': len(stocks),
+                'loaded': True
+            }
+        else:
+            return {
+                'count': 0,
+                'loaded': False
+            }
+    except:
+        return {
+            'count': 0,
+            'loaded': False
+        }
+
+def clear_stock_cache():
+    """清除股票数据缓存"""
+    st.cache_data.clear()
+
 
 @st.cache_data(ttl=60)  # 1分钟缓存 - 更实时的市场数据
 def get_market_indices():
@@ -697,6 +750,22 @@ if not check_password():
 # 侧边栏
 with st.sidebar:
     st.header("⚙️ 控制台")
+    
+    # 数据库缓存状态（可选显示）
+    with st.expander("📊 搜索缓存状态", expanded=False):
+        db_info = get_stock_db_info()
+        if db_info['loaded']:
+            st.success(f"✅ 已缓存 {db_info['count']:,} 只股票")
+            st.caption("💡 缓存有效期：1小时")
+            
+            if st.button("🔄 清除缓存", use_container_width=True, help="清除后下次搜索将重新加载"):
+                clear_stock_cache()
+                st.success("✅ 缓存已清除")
+                st.rerun()
+        else:
+            st.info("� 暂未加载\n\n首次搜索时自动加载并缓存")
+    
+    st.divider()
     
     # 股票搜索
     search_query = st.text_input("🔍 搜索股票", placeholder="输入代码或名称...")
