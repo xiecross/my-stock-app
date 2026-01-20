@@ -454,35 +454,57 @@ def get_stock_history(symbol, start_date, end_date, adjust='qfq'):
         st.error(f"获取历史数据失败: {e}")
         return None
 
-@st.cache_data(ttl=3600)  # 每小时缓存一次股票列表
+@st.cache_data(ttl=86400, persist="disk")  # 每天缓存一次，持久化到磁盘
 def get_all_stocks_list():
-    """获取全量股票列表（带缓存）"""
+    """获取全量股票代码和名称列表（轻量级）"""
     try:
-        stock_list = ak.stock_zh_a_spot_em()
+        # 使用更轻量的接口，仅获取代码和名称
+        stock_list = ak.stock_info_a_code_name()
         stocks_dict = {}
         for _, row in stock_list.iterrows():
-            code = str(row['代码'])
-            name = str(row['名称'])
+            code = str(row['code'])
+            name = str(row['name'])
             stocks_dict[code] = name
         return stocks_dict
     except Exception as e:
-        st.error(f"获取股票列表失败: {e}")
+        print(f"获取股票列表失败: {e}")  # 记录日志但不弹窗打扰用户
         return {}
 
 def search_stock(query):
-    """搜索股票（支持代码和名称）"""
+    """搜索股票（代码优先极速模式 + 名称模糊搜索）"""
     if not query:
         return []
     
-    query = str(query).upper()
-    stocks = get_all_stocks_list()
+    query = str(query).upper().strip()
     
+    # 1. 如果是6位数字代码，直接验证并返回（极速模式，跳过列表下载）
+    if len(query) == 6 and query.isdigit():
+        # 这里为了速度，我们假设它是有效的，或者由前端加载时再验证
+        # 如果需要更严谨，可以尝试获取一次info，但这会消耗一次网络请求
+        # 为了极速体验，我们直接构造返回，让“加载”步骤去处理无效代码
+        return [{'code': query, 'name': '按代码加载...'}]
+    
+    # 2. 如果不是纯代码，则进行名称搜索（需要下载列表）
+    stocks = get_all_stocks_list()
+    if not stocks:
+        return []
+        
     results = []
+    # 优先搜索代码匹配（针对简短代码如 "600"）
     for code, name in stocks.items():
-        if query in code or query in name:
+        if query in code:
             results.append({'code': code, 'name': name})
-            if len(results) >= 20:  # 限制返回20条
+            if len(results) >= 10:
                 break
+    
+    # 如果代码匹配不足，再搜名称
+    if len(results) < 20:
+        for code, name in stocks.items():
+            if query in name and {'code': code, 'name': name} not in results:
+                results.append({'code': code, 'name': name})
+                if len(results) >= 20:
+                    break
+                    
     return results
 
 def validate_stock_code(code):
