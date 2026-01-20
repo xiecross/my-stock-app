@@ -478,6 +478,7 @@ def load_stock_database_to_session():
                 
                 st.session_state.stock_database = stocks_dict
                 st.session_state.stock_db_update_time = current_time
+                st.session_state.stock_db_loaded = True
                 return stocks_dict, current_time
         except Exception as e:
             print(f"更新股票数据库失败: {e}")
@@ -752,6 +753,10 @@ if 'watchlist' not in st.session_state:
         '600036': '招商银行'
     }
 
+# Flag to indicate if stock database has been loaded
+if 'stock_db_loaded' not in st.session_state:
+    st.session_state.stock_db_loaded = False
+
 # ---------------------------------------------------------
 # 密码验证 - 只有通过验证才显示主应用
 # ---------------------------------------------------------
@@ -767,36 +772,41 @@ with st.sidebar:
     st.header("⚙️ 控制台")
     
     # 数据库状态显示
-    try:
-        stocks, update_time = load_stock_database_to_session()
-        if stocks:
-            update_datetime = datetime.fromtimestamp(update_time)
-            time_diff = datetime.now() - update_datetime
-            minutes_ago = int(time_diff.total_seconds() / 60)
-            
-            with st.expander("📊 股票数据库状态", expanded=False):
-                st.write(f"**股票数量:** {len(stocks):,} 只")
-                st.write(f"**更新时间:** {update_datetime.strftime('%Y-%m-%d %H:%M')}")
-                if minutes_ago < 60:
-                    st.write(f"**距今:** {minutes_ago} 分钟前")
-                else:
-                    hours_ago = int(minutes_ago / 60)
-                    st.write(f"**距今:** {hours_ago} 小时前")
+    # Lazy load stock database status
+    if st.session_state.stock_db_loaded:
+        try:
+            stocks, update_time = load_stock_database_to_session()
+            if stocks:
+                update_datetime = datetime.fromtimestamp(update_time)
+                time_diff = datetime.now() - update_datetime
+                minutes_ago = int(time_diff.total_seconds() / 60)
                 
-                st.caption("💡 数据库存储在会话内存中，每小时自动更新")
-                
-                if st.button("🔄 手动刷新数据库", use_container_width=True):
-                    with st.spinner("正在更新股票数据库..."):
-                        new_stocks, new_time = force_refresh_stock_database()
-                        if new_stocks:
-                            st.success(f"✅ 已更新 {len(new_stocks):,} 只股票数据")
-                            st.rerun()
-                        else:
-                            st.error("❌ 更新失败，请稍后重试")
-        else:
-            st.info("📥 首次使用，正在初始化股票数据库...")
-    except Exception as e:
-        st.warning(f"⚠️ 数据库状态获取失败")
+                with st.expander("📊 股票数据库状态", expanded=False):
+                    st.write(f"**股票数量:** {len(stocks):,} 只")
+                    st.write(f"**更新时间:** {update_datetime.strftime('%Y-%m-%d %H:%M')}")
+                    if minutes_ago < 60:
+                        st.write(f"**距今:** {minutes_ago} 分钟前")
+                    else:
+                        hours_ago = int(minutes_ago / 60)
+                        st.write(f"**距今:** {hours_ago} 小时前")
+                    
+                    st.caption("💡 数据库存储在会话内存中，每小时自动更新")
+                    
+                    if st.button("🔄 手动刷新数据库", use_container_width=True):
+                        with st.spinner("正在更新股票数据库..."):
+                            new_stocks, new_time = force_refresh_stock_database()
+                            if new_stocks:
+                                st.success(f"✅ 已更新 {len(new_stocks):,} 只股票数据")
+                                st.session_state.stock_db_loaded = True
+                                st.rerun()
+                            else:
+                                st.error("❌ 更新失败，请稍后重试")
+            else:
+                st.info("📥 数据库为空，点击刷新加载。")
+        except Exception as e:
+            st.warning(f"⚠️ 数据库状态获取失败")
+    else:
+        st.info("📥 数据库未加载。请先搜索股票或点击手动刷新加载。")
     
     st.divider()
     
