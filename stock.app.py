@@ -814,7 +814,7 @@ with st.sidebar:
     # 使用 key 和 on_change 实现回车加载
     st.text_input(
         "代码或名称", 
-        placeholder="例如: 600519 / 茅台 (回车体验)", 
+        placeholder="例如: 600519 / 茅台 ", 
         key="search_query_input",
         on_change=handle_search_submit
     )
