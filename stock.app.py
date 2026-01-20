@@ -485,13 +485,13 @@ def create_candlestick_chart(df, show_ma=True, show_bb=False):
         xaxis_rangeslider_visible=True,  # 启用范围滑块
         hovermode='x unified',
         template='plotly_white',
-        margin=dict(t=30, b=30, l=50, r=50),
+        margin=dict(t=30, b=30, l=50, r=100), # 增加右边距以容纳图例
         legend=dict(
-            orientation="h",
-            yanchor="bottom",
-            y=1.02,
-            xanchor="right",
-            x=1
+            orientation="v",         # 纵向排列
+            yanchor="top",
+            y=1,
+            xanchor="left",
+            x=1.02                  # 移至右侧
         ),
         # 启用十字光标跟踪
         xaxis=dict(
@@ -500,6 +500,11 @@ def create_candlestick_chart(df, show_ma=True, show_bb=False):
             spikesnap='cursor',
             spikedash='dash',
             spikethickness=1
+        ),
+        hoverlabel=dict(
+            bgcolor="white",
+            font_size=12,
+            font_family="Inter"
         )
     )
     
@@ -524,9 +529,17 @@ def create_volume_chart(df):
     fig.update_layout(
         height=300,
         template='plotly_white',
-        margin=dict(t=10, b=30, l=50, r=50),
+        margin=dict(t=10, b=30, l=50, r=100), # 增加右边距
         xaxis_title='日期',
         yaxis_title='成交量',
+        # 移至右侧
+        legend=dict(
+            orientation="v",
+            yanchor="top",
+            y=1,
+            xanchor="left",
+            x=1.02
+        ),
         # 启用十字光标跟踪
         xaxis=dict(
             showspikes=True,
@@ -738,6 +751,27 @@ if check_password():
                         'modeBarButtonsToAdd': ['drawline', 'drawopenpath', 'eraseshape']
                     }
                 )
+                
+                # 新手导读
+                with st.expander("📚 投资视角：指标入门导读", expanded=False):
+                    st.markdown("""
+                    ### 🔍 如何解读这些指标？
+                    
+                    *   **移动平均线 (MA)**: 趋势的“指南铁”。MA5/MA10 反应短期热度，MA20/MA60 代表中期趋势。
+                        - *金叉*: 短期线上穿长期线，通常视为看多信号。
+                        - *死叉*: 短期线下穿长期线，通常视为风险信号。
+                    
+                    *   **MACD (平滑异同移动平均线)**: 趋势的“加速器”。
+                        - *红柱放量*: 动能增强；*绿柱出现*: 调整开始。
+                        - *金叉/死叉*: 辅助判断趋势的反转点。
+                    
+                    *   **RSI (相对强弱指标)**: 市场的“温度计”。
+                        - *高于 70*: 处于“超买”状态，警惕回调风险。
+                        - *低于 30*: 处于“超卖”状态，可能存在反弹机会。
+                    
+                    *   **布林带 (Bollinger Bands)**: 价格的“护栏”。
+                        - 股价运行在 **中轨** 之上为强势，触碰 **上轨** 有回踩压力，企稳 **下轨** 有反弹可能。
+                    """)
 
             with tab_volume:
                 st.plotly_chart(
