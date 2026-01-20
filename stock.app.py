@@ -458,51 +458,61 @@ def get_stock_history(symbol, start_date, end_date, adjust='qfq'):
 # 股票数据库管理 - 内存缓存（适配Streamlit Cloud）
 # ---------------------------------------------------------
 
+@st.cache_data(ttl=3600)  # 每小时缓存一次股票列表
+def get_all_stocks_list():
+    """获取全量股票列表（带缓存）"""
+    try:
+        stock_list = ak.stock_zh_a_spot_em()
+        stocks_dict = {}
+        for _, row in stock_list.iterrows():
+            code = str(row['代码'])
+            name = str(row['名称'])
+            stocks_dict[code] = name
+        return stocks_dict, datetime.now().timestamp()
+    except Exception as e:
+        print(f"获取股票列表失败: {e}")
+        return None, 0
+
 def load_stock_database_to_session():
-    """加载股票数据库到session_state（仅在会话中执行一次）"""
+    """懒加载股票数据库到session_state"""
     if 'stock_database' not in st.session_state:
-        st.session_state.stock_database = {}
+        st.session_state.stock_database = None
         st.session_state.stock_db_update_time = 0
     
-    current_time = datetime.now().timestamp()
-    # 如果数据库为空或超过1小时，则更新（Streamlit Cloud环境下缩短更新间隔）
-    if not st.session_state.stock_database or (current_time - st.session_state.stock_db_update_time) > 3600:
-        try:
-            with st.spinner('正在加载股票数据库...'):
-                stock_list = ak.stock_zh_a_spot_em()
-                stocks_dict = {}
-                for _, row in stock_list.iterrows():
-                    code = str(row['代码'])
-                    name = str(row['名称'])
-                    stocks_dict[code] = name
-                
-                st.session_state.stock_database = stocks_dict
-                st.session_state.stock_db_update_time = current_time
-                st.session_state.stock_db_loaded = True
-                return stocks_dict, current_time
-        except Exception as e:
-            print(f"更新股票数据库失败: {e}")
-            # 如果更新失败但已有数据，继续使用旧数据
-            if st.session_state.stock_database:
-                return st.session_state.stock_database, st.session_state.stock_db_update_time
-        return {}, 0
+    if st.session_state.stock_database is None:
+        with st.spinner('正在初始化股票搜索数据库...'):
+            stocks, update_time = get_all_stocks_list()
+            if stocks:
+                st.session_state.stock_database = stocks
+                st.session_state.stock_db_update_time = update_time
     
     return st.session_state.stock_database, st.session_state.stock_db_update_time
 
 def search_stock_fast(query):
-    """轻量化搜索：每次直接在线获取股票列表并过滤"""
+    """快速搜索股票（使用内存数据库）"""
     try:
-        # 直接从 akshare 获取最新的 A 股列表
-        stock_list = ak.stock_zh_a_spot_em()
+        stocks, update_time = load_stock_database_to_session()
+        
+        if not stocks:
+            # 如果数据库为空，回退到在线搜索
+            return search_stock_online(query)
+        
         query = query.upper()
-        # 过滤代码或名称包含查询字符串的行
-        filtered = stock_list[stock_list['代码'].str.contains(query) | stock_list['名称'].str.contains(query)]
-        # 只保留前 20 条结果
-        filtered = filtered.head(20)
-        if not filtered.empty:
-            return filtered[['代码', '名称']]
+        results = []
+        
+        # 搜索代码和名称
+        for code, name in stocks.items():
+            if query in code or query in name:
+                results.append({'代码': code, '名称': name})
+                if len(results) >= 20:  # 限制返回20条
+                    break
+        
+        if results:
+            df = pd.DataFrame(results)
+            return df
         else:
             return pd.DataFrame(columns=['代码', '名称'])
+            
     except Exception as e:
         st.error(f"搜索失败: {e}")
         return None
@@ -742,10 +752,6 @@ if 'watchlist' not in st.session_state:
         '600036': '招商银行'
     }
 
-# Flag to indicate if stock database has been loaded
-if 'stock_db_loaded' not in st.session_state:
-    st.session_state.stock_db_loaded = False
-
 # ---------------------------------------------------------
 # 密码验证 - 只有通过验证才显示主应用
 # ---------------------------------------------------------
@@ -760,8 +766,24 @@ if not check_password():
 with st.sidebar:
     st.header("⚙️ 控制台")
     
-    # 简化侧边栏：仅提供搜索框，去除数据库状态显示和手动刷新
-    st.info("搜索股票将实时从网络获取数据，无需预加载数据库。")
+    st.divider()
+    
+    # 数据库状态显示 - 仅在已加载时显示
+    if 'stock_database' in st.session_state and st.session_state.stock_database:
+        stocks = st.session_state.stock_database
+        update_time = st.session_state.stock_db_update_time
+        update_datetime = datetime.fromtimestamp(update_time)
+        
+        with st.expander("📊 股票搜索数据库状态", expanded=False):
+            st.write(f"**股票数量:** {len(stocks):,} 只")
+            st.write(f"**更新时间:** {update_datetime.strftime('%Y-%m-%d %H:%M')}")
+            
+            st.caption("💡 数据库已懒加载至内存，提高搜索速度")
+            
+            if st.button("🔄 强制更新数据库", use_container_width=True):
+                st.cache_data.clear() # 清除缓存
+                st.session_state.stock_database = None
+                st.rerun()
     
     st.divider()
     
