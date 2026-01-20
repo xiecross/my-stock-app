@@ -454,18 +454,40 @@ def get_stock_history(symbol, start_date, end_date, adjust='qfq'):
         st.error(f"获取历史数据失败: {e}")
         return None
 
-# ---------------------------------------------------------
-# 股票数据接口 - 按需获取单个股票
-# ---------------------------------------------------------
+@st.cache_data(ttl=3600)  # 每小时缓存一次股票列表
+def get_all_stocks_list():
+    """获取全量股票列表（带缓存）"""
+    try:
+        stock_list = ak.stock_zh_a_spot_em()
+        stocks_dict = {}
+        for _, row in stock_list.iterrows():
+            code = str(row['代码'])
+            name = str(row['名称'])
+            stocks_dict[code] = name
+        return stocks_dict
+    except Exception as e:
+        st.error(f"获取股票列表失败: {e}")
+        return {}
+
+def search_stock(query):
+    """搜索股票（支持代码和名称）"""
+    if not query:
+        return []
+    
+    query = str(query).upper()
+    stocks = get_all_stocks_list()
+    
+    results = []
+    for code, name in stocks.items():
+        if query in code or query in name:
+            results.append({'code': code, 'name': name})
+            if len(results) >= 20:  # 限制返回20条
+                break
+    return results
 
 def validate_stock_code(code):
-    """简单验证股票代码格式"""
-    if not code:
-        return False
-    # A股代码通常为6位数字
+    """验证是否为6位数字股票代码"""
     return len(code) == 6 and code.isdigit()
-
-# 移除了原有的全量股票数据库加载和搜索逻辑，以提高性能
 
 @st.cache_data(ttl=60)  # 1分钟缓存 - 更实时的市场数据
 def get_market_indices():
@@ -680,33 +702,48 @@ if not check_password():
 with st.sidebar:
     st.header("⚙️ 控制台")
     
-    # 股票加载
-    st.subheader("🔍 加载股票")
-    input_code = st.text_input("输入股票代码", value=st.session_state.current_stock, placeholder="例如: 600519")
+    # 搜索
+    st.subheader("搜索")
+    search_query = st.text_input("代码或名称", placeholder="例如: 600519 / 茅台")
     
-    col_load, col_add = st.columns(2)
-    with col_load:
-        if st.button("� 加载", use_container_width=True):
-            if validate_stock_code(input_code):
-                st.session_state.current_stock = input_code
-                st.rerun()
+    if search_query:
+        with st.spinner("正在搜索..."):
+            results = search_stock(search_query)
+        
+        if results:
+            # 如果只有一个精准匹配的代码
+            if len(results) == 1:
+                selected_stock = results[0]
             else:
-                st.error("请输入有效的6位股票代码")
-    
-    with col_add:
-        if st.button("⭐ 收藏", use_container_width=True):
-            if validate_stock_code(input_code):
-                # 尝试获取简称以展示
-                with st.spinner("正在获取股票信息..."):
-                    info = get_stock_info(input_code)
-                    if info:
-                        name = info.get('股票简称', '未知股票')
-                        st.session_state.watchlist[input_code] = name
-                        st.success(f"已加入收藏: {name}")
+                # 多个匹配项，让用户选择
+                options = [f"{r['code']} - {r['name']}" for r in results]
+                selected_label = st.selectbox("选择股票", options)
+                selected_code = selected_label.split(" - ")[0]
+                selected_stock = next(r for r in results if r['code'] == selected_code)
+            
+            col_load, col_add = st.columns(2)
+            with col_load:
+                if st.button("加载", use_container_width=True):
+                    st.session_state.current_stock = selected_stock['code']
+                    st.rerun()
+            
+            with col_add:
+                if st.button("收藏", use_container_width=True):
+                    if selected_stock['code'] not in st.session_state.watchlist:
+                        st.session_state.watchlist[selected_stock['code']] = selected_stock['name']
+                        st.success(f"已添加收藏: {selected_stock['name']}")
+                        st.rerun()
                     else:
-                        st.error("无法获取股票信息，请检查代码")
-            else:
-                st.error("请输入有效的6位股票代码")
+                        st.info("已在收藏夹中")
+        else:
+            st.warning("未找到匹配的股票")
+    else:
+        # 如果没有搜索词，显示当前股票的快速操作
+        col_load, col_add = st.columns(2)
+        with col_load:
+            st.button("加载", disabled=True, use_container_width=True)
+        with col_add:
+            st.button("收藏", disabled=True, use_container_width=True)
     
     st.divider()
     
