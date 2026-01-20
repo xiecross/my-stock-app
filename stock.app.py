@@ -356,6 +356,29 @@ def add_technical_indicators(df):
     df = calculate_bollinger_bands(df)
     return df
 
+def format_value(val, unit_type='amount'):
+    """金额和数量的单位自动转换及保留两位小数"""
+    try:
+        val = float(val)
+    except (ValueError, TypeError):
+        return "-"
+    
+    if unit_type == 'amount':
+        if abs(val) >= 1e8:
+            return f"{val/1e8:.2f} 亿"
+        elif abs(val) >= 1e4:
+            return f"{val/1e4:.2f} 万"
+        else:
+            return f"{val:.2f} 元"
+    elif unit_type == 'volume':
+        if abs(val) >= 1e8:
+            return f"{val/1e8:.2f} 亿股"
+        elif abs(val) >= 1e4:
+            return f"{val/1e4:.2f} 万股"
+        else:
+            return f"{val:.2f} 股"
+    return f"{val:.2f}"
+
 # ---------------------------------------------------------
 # 4. 图表创建函数
 # ---------------------------------------------------------
@@ -606,7 +629,7 @@ if check_password():
             with col3:
                 st.metric(
                     "成交额",
-                    f"{latest['成交额']/1e8:.2f} 亿",
+                    format_value(latest['成交额']),
                     help="当日买卖总金额"
                 )
             
@@ -647,7 +670,7 @@ if check_password():
             
             with col4:
                 if 'MACD' in latest:
-                    st.metric("MACD", f"{latest['MACD']:.4f}", 
+                    st.metric("MACD", f"{latest['MACD']:.2f}", 
                              "多头" if latest['MACD'] > latest['Signal'] else "空头")
             
             with col5:
@@ -655,23 +678,23 @@ if check_password():
                 up_days = len(hist_df[hist_df['涨跌幅'] > 0])
                 total_days = len(hist_df)
                 win_rate = (up_days / total_days * 100) if total_days > 0 else 0
-                st.metric("上涨天数占比", f"{win_rate:.1f}%", f"{up_days}/{total_days}天")
+                st.metric("上涨天数占比", f"{win_rate:.2f}%", f"{up_days}/{total_days}天")
 
             # --- 第二部分：深度基本面 ---
             with st.expander("📋 更多维度基本面数据", expanded=False):
                 col_a, col_b, col_c, col_d = st.columns(4)
                 
                 with col_a:
-                    st.write(f"**总市值**: {float(info_dict.get('总市值', 0))/1e8:.2f} 亿元")
-                    st.write(f"**流通市值**: {float(info_dict.get('流通市值', 0))/1e8:.2f} 亿元")
+                    st.write(f"**总市值**: {format_value(info_dict.get('总市值', 0))}")
+                    st.write(f"**流通市值**: {format_value(info_dict.get('流通市值', 0))}")
                 
                 with col_b:
                     st.write(f"**市盈率 (静)**: {info_dict.get('市盈率-动态', '-')}")
                     st.write(f"**市净率 (P/B)**: {info_dict.get('市净率', '-')}")
                 
                 with col_c:
-                    st.write(f"**总股本**: {float(info_dict.get('总股本', 0))/1e8:.2f} 亿股")
-                    st.write(f"**流通股本**: {float(info_dict.get('流通股本', 0))/1e8:.2f} 亿股")
+                    st.write(f"**总股本**: {format_value(info_dict.get('总股本', 0), 'volume')}")
+                    st.write(f"**流通股本**: {format_value(info_dict.get('流通股本', 0), 'volume')}")
                 
                 with col_d:
                     st.write(f"**每股收益**: {info_dict.get('每股收益', '-')}")
@@ -679,10 +702,10 @@ if check_password():
 
             # --- 第三部分：可视化与明细 ---
             tab_chart, tab_volume, tab_raw, tab_profile = st.tabs([
-                "� 技术分析图表",
-                "� 成交量分析", 
-                "�📄 历史明细",
-                "🏢 企业档案"
+                "技术分析图表",
+                " 成交量分析", 
+                " 历史明细",
+                " 企业档案"
             ])
 
             with tab_chart:
@@ -702,13 +725,13 @@ if check_password():
                 col1, col2, col3 = st.columns(3)
                 with col1:
                     avg_volume = hist_df['成交量'].mean()
-                    st.metric("平均成交量", f"{avg_volume/1e8:.2f} 亿股")
+                    st.metric("平均成交量", format_value(avg_volume, 'volume'))
                 with col2:
                     max_volume = hist_df['成交量'].max()
-                    st.metric("最大成交量", f"{max_volume/1e8:.2f} 亿股")
+                    st.metric("最大成交量", format_value(max_volume, 'volume'))
                 with col3:
                     avg_amount = hist_df['成交额'].mean()
-                    st.metric("平均成交额", f"{avg_amount/1e8:.2f} 亿元")
+                    st.metric("平均成交额", format_value(avg_amount))
 
             with tab_raw:
                 st.write("#### 📋 历史交易明细")
@@ -736,8 +759,8 @@ if check_password():
                         '最低': '¥{:.2f}',
                         '涨跌幅': '{:.2f}%',
                         '换手率': '{:.2f}%',
-                        '成交量': '{:.0f}',
-                        '成交额': '{:.0f}'
+                        '成交量': lambda x: format_value(x, 'volume'),
+                        '成交额': lambda x: format_value(x, 'amount')
                     }),
                     use_container_width=True,
                     height=400
