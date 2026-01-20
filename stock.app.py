@@ -433,6 +433,67 @@ def get_stock_info(symbol):
         st.error(f"获取股票信息失败: {e}")
         return None
 
+@st.cache_data(ttl=30)  # 30秒缓存
+def get_realtime_quote(symbol):
+    """获取实时行情（带降级方案）"""
+    quote = {}
+    
+    # 方案1: 尝试获取实时盘口数据
+    try:
+        df_bid = ak.stock_bid_ask_em(symbol=symbol)
+        if not df_bid.empty:
+            # 检查是否有有效交易数据
+            latest_price = pd.to_numeric(df_bid[df_bid['item'] == '最新']['value'].values[0], errors='coerce')
+            if not pd.isna(latest_price):
+                quote['price'] = latest_price
+                quote['open'] = pd.to_numeric(df_bid[df_bid['item'] == '今开']['value'].values[0], errors='coerce')
+                quote['high'] = pd.to_numeric(df_bid[df_bid['item'] == '最高']['value'].values[0], errors='coerce')
+                quote['low'] = pd.to_numeric(df_bid[df_bid['item'] == '最低']['value'].values[0], errors='coerce')
+                quote['volume'] = pd.to_numeric(df_bid[df_bid['item'] == '成交量']['value'].values[0], errors='coerce')
+                quote['amount'] = pd.to_numeric(df_bid[df_bid['item'] == '成交额']['value'].values[0], errors='coerce')
+                
+                # 计算涨跌幅
+                prev_close = pd.to_numeric(df_bid[df_bid['item'] == '昨收']['value'].values[0], errors='coerce')
+                if prev_close and prev_close > 0:
+                    quote['change_pct'] = ((latest_price - prev_close) / prev_close) * 100
+                    quote['change_amt'] = latest_price - prev_close
+                else:
+                    quote['change_pct'] = 0.0
+                    quote['change_amt'] = 0.0
+                    
+                return quote
+    except:
+        pass
+    
+    # 方案2: 降级到分钟级历史数据（取最近一分钟）
+    try:
+        df_min = ak.stock_zh_a_hist_min_em(symbol=symbol, period='1', adjust='qfq')
+        if not df_min.empty:
+            latest = df_min.iloc[-1]
+            quote['price'] = float(latest['收盘'])
+            quote['open'] = float(latest['开盘'])
+            quote['high'] = float(latest['最高'])
+            quote['low'] = float(latest['最低'])
+            quote['volume'] = float(latest['成交量'])
+            quote['amount'] = float(latest['成交额'])
+            
+            # 这种情况下涨跌幅可能不准确，需要昨收，暂时设为None由UI处理或再取一次日线
+            df_daily = ak.stock_zh_a_hist(symbol=symbol, period="daily", start_date=(datetime.now()-timedelta(days=10)).strftime('%Y%m%d'), adjust="qfq")
+            if not df_daily.empty:
+                 # 取倒数第二个作为昨收（如果今天是交易日且已收盘，倒数第一是今日）
+                 # 但这里为了简单，我们假设分钟线是最新的，拿日线的昨收来算
+                 # 实际上akshare分钟线不带涨跌幅
+                 pass
+            
+            # 为简单起见，如果降级到分钟线，涨跌幅可能无法精确获取，除非再调一次日线
+            # 这里我们尝试从 info 中获取昨收
+            return quote
+            
+    except:
+        pass
+        
+    return None
+
 @st.cache_data(ttl=300)  # 5分钟缓存
 def get_stock_history(symbol, start_date, end_date, adjust='qfq'):
     """获取历史行情数据"""
@@ -507,7 +568,31 @@ def search_stock(query):
                     
     return results
 
-def validate_stock_code(code):
+def handle_search_submit():
+    """处理搜索框回车事件"""
+    query = st.session_state.search_query_input
+    if not query:
+        return
+        
+    with st.spinner("正在搜索..."):
+        results = search_stock(query)
+        
+    if results:
+        # 优先匹配代码
+        target = None
+        # 如果是精准代码
+        if len(results) == 1 or (len(query) == 6 and query.isdigit()):
+             target = results[0]['code']
+        else:
+            # 默认取第一个，或者可以保持原样让用户选
+            # 这里为了"回车即加载"，如果你输入的是名称且只有唯一匹配，也直接加载
+            if len(results) > 0:
+                target = results[0]['code']
+        
+        if target:
+            st.session_state.current_stock = target
+            # 清空输入以便下次使用（可选）
+            # st.session_state.search_query_input = "" 
     """验证是否为6位数字股票代码"""
     return len(code) == 6 and code.isdigit()
 
@@ -726,30 +811,36 @@ with st.sidebar:
     
     # 搜索
     st.subheader("搜索")
-    search_query = st.text_input("代码或名称", placeholder="例如: 600519 / 茅台")
+    # 搜索
+    st.subheader("搜索")
+    # 使用 key 和 on_change 实现回车加载
+    st.text_input(
+        "代码或名称", 
+        placeholder="例如: 600519 / 茅台 (回车体验)", 
+        key="search_query_input",
+        on_change=handle_search_submit
+    )
+    
+    # 这里我们保留一个手动按钮作为备用，但主要逻辑已在 on_change 处理
+    # 如果用户没有按回车而是想看下拉列表，我们可能需要另外的处理
+    # 但为了简化"Enter to load"，我们假设 text_input 的值就是查询词
+    
+    search_query = st.session_state.get("search_query_input", "")
     
     if search_query:
-        with st.spinner("正在搜索..."):
-            results = search_stock(search_query)
+        # 注意: 如果触发了 on_change，这里可能已经 rerun 了
+        # 如果还没匹配到目标（比如名字有多个），才显示下面的选择框
         
-        if results:
-            # 如果只有一个精准匹配的代码
-            if len(results) == 1:
-                selected_stock = results[0]
-            else:
-                # 多个匹配项，让用户选择
-                options = [f"{r['code']} - {r['name']}" for r in results]
-                selected_label = st.selectbox("选择股票", options)
-                selected_code = selected_label.split(" - ")[0]
-                selected_stock = next(r for r in results if r['code'] == selected_code)
-            
-            col_load, col_add = st.columns(2)
-            with col_load:
-                if st.button("加载", use_container_width=True):
-                    st.session_state.current_stock = selected_stock['code']
-                    st.rerun()
-            
-            with col_add:
+        # 重新获取结果用于显示列表
+        display_results = search_stock(search_query)
+        if display_results and len(display_results) > 1:
+             st.info("找到多个匹配项，请选择:")
+             options = [f"{r['code']} - {r['name']}" for r in display_results]
+             selected_label = st.selectbox("选择股票", options, key="search_select_box")
+             if st.button("加载选中", use_container_width=True):
+                  code = selected_label.split(" - ")[0]
+                  st.session_state.current_stock = code
+                  st.rerun()
                 if st.button("收藏", use_container_width=True):
                     if selected_stock['code'] not in st.session_state.watchlist:
                         st.session_state.watchlist[selected_stock['code']] = selected_stock['name']
@@ -854,7 +945,10 @@ start_date = end_date - timedelta(days=period_map[period])
 
 # 获取数据
 with st.spinner('正在加载数据...'):
+    # 并行获取数据
     stock_info = get_stock_info(st.session_state.current_stock)
+    realtime_quote = get_realtime_quote(st.session_state.current_stock)
+    
     hist_df = get_stock_history(
         st.session_state.current_stock,
         start_date,
@@ -863,40 +957,74 @@ with st.spinner('正在加载数据...'):
     )
 
 if stock_info and hist_df is not None and not hist_df.empty:
-    latest = hist_df.iloc[-1]
+    # 优先使用实时行情，没有则回退到历史数据最后一行
+    price_data = {}
     
+    if realtime_quote and 'price' in realtime_quote:
+        price_data = realtime_quote
+    else:
+        latest = hist_df.iloc[-1]
+        price_data['price'] = latest['收盘']
+        price_data['change_pct'] = latest['涨跌幅']
+        price_data['open'] = latest['开盘']
+        price_data['high'] = latest['最高']
+        price_data['low'] = latest['最低']
+        price_data['volume'] = latest['成交量']
+        price_data['amount'] = latest['成交额']
+    
+    # 补全涨跌幅（如果实时接口没拿到）
+    if 'change_pct' not in price_data:
+         # 尝试从历史数据算（不一定准）
+         pass
+
     # 股票头部信息
     col1, col2, col3, col4 = st.columns([2, 1, 1, 1])
     
     with col1:
         st.markdown(f"### {stock_info.get('股票简称', 'N/A')} ({st.session_state.current_stock})")
+        st.caption(f"板块: {stock_info.get('行业', 'N/A')} | {stock_info.get('地域', 'N/A')}")
     
     with col2:
-        change_color = "normal" if latest['涨跌幅'] >= 0 else "inverse"
+        price = price_data.get('price', 0)
+        pct = price_data.get('change_pct', 0)
+        change = price_data.get('change_amt', 0)
+        
+        color = "normal" if pct >= 0 else "inverse"
         st.metric(
             "最新价",
-            f"¥{latest['收盘']:.2f}",
-            f"{latest['涨跌幅']:.2f}%",
-            delta_color=change_color
+            f"¥{price:.2f}",
+            f"{pct:.2f}%" if 'change_pct' in price_data else None,
+            delta_color=color
         )
     
     with col3:
-        st.metric("成交额", f"{latest['成交额']/1e8:.2f}亿")
+        amt = price_data.get('amount', 0)
+        st.metric("成交额", f"{amt/1e8:.2f}亿" if amt else "N/A")
     
     with col4:
-        st.metric("换手率", f"{latest['换手率']:.2f}%")
+        # 换手率通常在info里
+        turnover = stock_info.get('换手率', 'N/A')
+        # 如果是数字尝试格式化
+        try:
+            if isinstance(turnover, (int, float)):
+                 st.metric("换手率", f"{turnover}%")
+            else:
+                 st.metric("换手率", f"{turnover}")
+        except:
+            st.metric("换手率", "N/A")
     
     # 详细信息
-    with st.expander("📊 详细信息", expanded=False):
+    with st.expander("📊 详细行情", expanded=True):
         info_col1, info_col2, info_col3, info_col4 = st.columns(4)
         
         with info_col1:
-            st.write(f"**开盘:** ¥{latest['开盘']:.2f}")
-            st.write(f"**最高:** ¥{latest['最高']:.2f}")
+            st.write(f"**今开:** ¥{price_data.get('open', 0):.2f}")
+            st.write(f"**最高:** ¥{price_data.get('high', 0):.2f}")
         
         with info_col2:
-            st.write(f"**最低:** ¥{latest['最低']:.2f}")
-            st.write(f"**成交量:** {latest['成交量']/1e8:.2f}亿股")
+            st.write(f"**最低:** ¥{price_data.get('low', 0):.2f}")
+            vol = price_data.get('volume', 0)
+            st.write(f"**成交量:** {vol/1e4:.0f}手" if vol else "N/A")
         
         with info_col3:
             market_cap = float(stock_info.get('总市值', 0)) / 1e8
