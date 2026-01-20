@@ -19,145 +19,138 @@ st.set_page_config(
 # 自定义CSS样式 - 优化移动端体验 + 自适应主题
 st.markdown("""
 <style>
-    /* CSS变量定义 - 深色主题（默认） */
+    /* 全局字体与背景 */
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Noto+Sans+SC:wght@400;500;700&display=swap');
+    
     :root {
-        --bg-primary: #0a0e27;
-        --bg-secondary: #131722;
-        --bg-tertiary: #1e222d;
-        --bg-hover: #2a2e39;
-        
-        --text-primary: #d1d4dc;
-        --text-secondary: #787b86;
-        --text-tertiary: #434651;
-        
-        --border-color: #2a2e39;
-        --border-light: #363a45;
-        
-        --accent-blue: #2962ff;
-        --gradient-start: #667eea;
-        --gradient-end: #764ba2;
-        
-        --modebar-bg: rgba(19, 23, 34, 0.9);
-        --refresh-info-bg: #131722;
-        --refresh-info-border: #2962ff;
+        --bg-color: #0e1117;
+        --card-bg: rgba(22, 27, 34, 0.8);
+        --card-border: rgba(48, 54, 61, 0.5);
+        --text-primary: #e6edf3;
+        --text-secondary: #8b949e;
+        --accent-color: #58a6ff;
+        --up-color: #238636;  /* GitHub Green */
+        --down-color: #da3633; /* GitHub Red */
+        --glass-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
     }
-    
-    /* 浅色主题 - 根据系统设置自动切换 */
-    @media (prefers-color-scheme: light) {
-        :root {
-            --bg-primary: #ffffff;
-            --bg-secondary: #f5f5f5;
-            --bg-tertiary: #e8e8e8;
-            --bg-hover: #d0d0d0;
-            
-            --text-primary: #1a1a1a;
-            --text-secondary: #666666;
-            --text-tertiary: #999999;
-            
-            --border-color: #e0e0e0;
-            --border-light: #cccccc;
-            
-            --accent-blue: #2962ff;
-            --gradient-start: #667eea;
-            --gradient-end: #764ba2;
-            
-            --modebar-bg: rgba(245, 245, 245, 0.9);
-            --refresh-info-bg: #f5f5f5;
-            --refresh-info-border: #2962ff;
-        }
-    }
-    
-    .main {
-        background-color: var(--bg-primary);
-        color: var(--text-primary);
-    }
+
     .stApp {
-        background-color: var(--bg-primary);
-        color: var(--text-primary);
+        background-color: var(--bg-color);
+        font-family: 'Noto Sans SC', sans-serif;
     }
-    div[data-testid="stMetricValue"] {
-        font-size: 24px;
+    
+    /* 玻璃拟态卡片 */
+    .glass-card {
+        background: var(--card-bg);
+        border: 1px solid var(--card-border);
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 20px;
+        backdrop-filter: blur(10px);
+        box-shadow: var(--glass-shadow);
+    }
+    
+    /* 英雄榜（股票头部） */
+    .stock-hero {
+        background: linear-gradient(145deg, rgba(31,111,235,0.15) 0%, rgba(22,27,34,0.9) 100%);
+        border: 1px solid rgba(56,139,253,0.3);
+        border-radius: 16px;
+        padding: 25px;
+        margin-bottom: 25px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
+    .hero-title {
+        font-size: 28px;
         font-weight: 700;
         color: var(--text-primary);
+        letter-spacing: -0.5px;
     }
-    .stock-header {
-        background: linear-gradient(135deg, var(--gradient-start) 0%, var(--gradient-end) 100%);
-        padding: 20px;
-        border-radius: 10px;
-        margin-bottom: 20px;
-        color: white;
+    
+    .hero-subtitle {
+        font-size: 14px;
+        color: var(--text-secondary);
+        margin-top: 5px;
+        font-family: 'JetBrains Mono', monospace;
     }
-    .indicator-card {
-        background-color: var(--bg-secondary);
-        padding: 15px;
+    
+    .price-main {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 36px;
+        font-weight: 700;
+        line-height: 1;
+    }
+    
+    .price-change {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 16px;
+        font-weight: 500;
+        padding: 4px 8px;
+        border-radius: 6px;
+        margin-left: 10px;
+    }
+    
+    .up-bg { background: rgba(35, 134, 54, 0.2); color: #3fb950; }
+    .down-bg { background: rgba(218, 54, 51, 0.2); color: #f85149; }
+    
+    /* 关键指标网格 */
+    .metric-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 15px;
+        margin-top: 20px;
+    }
+    
+    .metric-item {
+        background: rgba(48, 54, 61, 0.3);
         border-radius: 8px;
-        border: 1px solid var(--border-color);
-        margin-bottom: 10px;
+        padding: 12px;
+        text-align: center;
     }
-    /* 移动端优化 */
-    @media (max-width: 768px) {
-        div[data-testid="stMetricValue"] {
-            font-size: 18px;
-        }
-        .stock-header {
-            padding: 15px;
-        }
+    
+    .metric-label {
+        font-size: 12px;
+        color: var(--text-secondary);
+        margin-bottom: 4px;
     }
-    /* 图表触摸优化 */
-    .js-plotly-plot .plotly .modebar {
-        left: 0 !important;
-        background: var(--modebar-bg) !important;
-        padding: 5px !important;
-    }
-    .refresh-info {
-        background-color: var(--refresh-info-bg);
-        padding: 10px;
-        border-radius: 5px;
-        border-left: 3px solid var(--refresh-info-border);
-        margin: 10px 0;
-        font-size: 13px;
+    
+    .metric-value {
+        font-size: 16px;
+        font-weight: 600;
         color: var(--text-primary);
+        font-family: 'JetBrains Mono', monospace;
     }
     
-    /* 全屏模式样式 */
-    .chart-fullscreen-container:fullscreen {
-        background-color: var(--bg-primary);
-        padding: 20px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
+    /* 调整 Sidebar */
+    section[data-testid="stSidebar"] {
+        background-color: #010409;
+        border-right: 1px solid var(--card-border);
     }
     
-    .chart-fullscreen-container:-webkit-full-screen {
-        background-color: var(--bg-primary);
-        padding: 20px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
+    /* 调整 Metric 组件样式 (覆盖原生) */
+    div[data-testid="stMetricValue"] {
+        font-family: 'JetBrains Mono', monospace !important;
     }
     
-    .chart-fullscreen-container:-moz-full-screen {
-        background-color: var(--bg-primary);
-        padding: 20px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
+    /* 分隔线优化 */
+    hr {
+        margin: 1.5rem 0;
+        border: 0;
+        border-top: 1px solid var(--card-border);
     }
     
-    .chart-fullscreen-container:-ms-fullscreen {
-        background-color: var(--bg-primary);
-        padding: 20px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
+    /* 按钮美化 */
+    .stButton > button {
+        border-radius: 8px;
+        font-weight: 600;
+        border: 1px solid var(--card-border);
+        transition: all 0.2s;
     }
-    
-    /* 全屏时图表占满整个屏幕 */
-    .chart-fullscreen-container:fullscreen .js-plotly-plot,
-    .chart-fullscreen-container:-webkit-full-screen .js-plotly-plot,
-    .chart-fullscreen-container:-moz-full-screen .js-plotly-plot {
-        width: 100% !important;
-        height: 100% !important;
+    .stButton > button:hover {
+        border-color: var(--accent-color);
+        background-color: rgba(88, 166, 255, 0.1);
     }
 </style>
 
@@ -591,9 +584,8 @@ def handle_search_submit():
         
         if target:
             st.session_state.current_stock = target
-            # 清空输入以便下次使用（可选）
-            # st.session_state.search_query_input = "" 
-    """验证是否为6位数字股票代码"""
+
+def is_valid_stock_code(code):
     return len(code) == 6 and code.isdigit()
 
 @st.cache_data(ttl=60)  # 1分钟缓存 - 更实时的市场数据
@@ -749,9 +741,11 @@ def create_candlestick_chart(df, indicators_data, show_ma=True, show_boll=False)
         fig.add_hline(y=70, line_dash="dash", line_color="red", row=current_row, col=1)
         fig.add_hline(y=30, line_dash="dash", line_color="green", row=current_row, col=1)
     
-    # 更新布局 - 优化移动端触摸交互
+    # 更新布局 - 深度定制暗色主题
     fig.update_layout(
         template='plotly_dark',
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)',
         xaxis_rangeslider_visible=False,
         height=800,
         showlegend=True,
@@ -760,23 +754,37 @@ def create_candlestick_chart(df, indicators_data, show_ma=True, show_boll=False)
             yanchor="bottom",
             y=1.02,
             xanchor="right",
-            x=1
+            x=1,
+            font=dict(color="#8b949e")
         ),
-        margin=dict(l=50, r=50, t=80, b=50),
+        margin=dict(l=10, r=10, t=60, b=20),
         # 移动端优化配置
-        dragmode='pan',  # 默认为平移模式，更适合触摸
-        hovermode='x unified',  # 统一悬停模式
+        dragmode='pan',
+        hovermode='x unified',
+        # 字体统一
+        font=dict(family="Noto Sans SC, sans-serif"),
         # 触摸交互配置
         modebar=dict(
             orientation='v',
-            bgcolor='rgba(19, 23, 34, 0.9)',
-            color='#d1d4dc',
-            activecolor='#2962ff'
+            bgcolor='rgba(22, 27, 34, 0.8)',
+            color='#8b949e',
+            activecolor='#58a6ff'
         )
     )
     
-    fig.update_xaxes(showgrid=True, gridwidth=1, gridcolor='#2a2e39')
-    fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor='#2a2e39')
+    # 坐标轴样式优化
+    fig.update_xaxes(
+        showgrid=True, 
+        gridwidth=1, 
+        gridcolor='rgba(48, 54, 61, 0.3)',
+        zeroline=False
+    )
+    fig.update_yaxes(
+        showgrid=True, 
+        gridwidth=1, 
+        gridcolor='rgba(48, 54, 61, 0.3)',
+        zeroline=False
+    )
     
     return fig
 
@@ -814,7 +822,7 @@ with st.sidebar:
     # 使用 key 和 on_change 实现回车加载
     st.text_input(
         "代码或名称", 
-        placeholder="例如: 600519 / 茅台 ", 
+        placeholder="例如: 600519 / 茅台 (回车体验)", 
         key="search_query_input",
         on_change=handle_search_submit
     )
@@ -993,63 +1001,67 @@ if stock_info and hist_df is not None and not hist_df.empty:
          # 尝试从历史数据算（不一定准）
          pass
 
-    # 股票头部信息
-    col1, col2, col3, col4 = st.columns([2, 1, 1, 1])
+    # 计算涨跌幅颜色
+    change_pct = price_data.get('change_pct', 0)
+    change_amt = price_data.get('change_amt', 0)
     
-    with col1:
-        st.markdown(f"### {stock_info.get('股票简称', 'N/A')} ({st.session_state.current_stock})")
-        st.caption(f"板块: {stock_info.get('行业', 'N/A')} | {stock_info.get('地域', 'N/A')}")
+    is_up = change_pct >= 0
+    color_class = "up-bg" if is_up else "down-bg"
+    arrow = "▲" if is_up else "▼"
     
-    with col2:
-        price = price_data.get('price', 0)
-        pct = price_data.get('change_pct', 0)
-        change = price_data.get('change_amt', 0)
-        
-        color = "normal" if pct >= 0 else "inverse"
-        st.metric(
-            "最新价",
-            f"¥{price:.2f}",
-            f"{pct:.2f}%" if 'change_pct' in price_data else None,
-            delta_color=color
-        )
+    # 渲染自定义 Hero Header
+    st.markdown(f"""
+    <div class="stock-hero">
+        <div>
+            <div class="hero-title">{stock_info.get('股票简称', '未知股票')} ({st.session_state.current_stock})</div>
+            <div class="hero-subtitle">
+                {stock_info.get('行业', '行业未知')} | {stock_info.get('地域', '地域未知')} | 
+                <span style="color: {'#3fb950' if is_up else '#f85149'}">{arrow} {abs(change_pct):.2f}%</span>
+            </div>
+        </div>
+        <div style="text-align: right;">
+            <div style="color: {'#3fb950' if is_up else '#f85149'};" class="price-main">
+                ¥{price_data.get('price', 0):.2f}
+                <span class="price-change {color_class}">
+                     {change_amt:+.2f}
+                </span>
+            </div>
+            <div class="hero-subtitle">成交量: {price_data.get('volume', 0)/1e4:.0f}手  成交额: {price_data.get('amount', 0)/1e8:.2f}亿</div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
     
-    with col3:
-        amt = price_data.get('amount', 0)
-        st.metric("成交额", f"{amt/1e8:.2f}亿" if amt else "N/A")
-    
-    with col4:
-        # 换手率通常在info里
-        turnover = stock_info.get('换手率', 'N/A')
-        # 如果是数字尝试格式化
-        try:
-            if isinstance(turnover, (int, float)):
-                 st.metric("换手率", f"{turnover}%")
-            else:
-                 st.metric("换手率", f"{turnover}")
-        except:
-            st.metric("换手率", "N/A")
-    
-    # 详细信息
-    with st.expander("📊 详细行情", expanded=True):
-        info_col1, info_col2, info_col3, info_col4 = st.columns(4)
-        
-        with info_col1:
-            st.write(f"**今开:** ¥{price_data.get('open', 0):.2f}")
-            st.write(f"**最高:** ¥{price_data.get('high', 0):.2f}")
-        
-        with info_col2:
-            st.write(f"**最低:** ¥{price_data.get('low', 0):.2f}")
-            vol = price_data.get('volume', 0)
-            st.write(f"**成交量:** {vol/1e4:.0f}手" if vol else "N/A")
-        
-        with info_col3:
-            market_cap = float(stock_info.get('总市值', 0)) / 1e8
-            st.write(f"**总市值:** {market_cap:.2f}亿")
-            st.write(f"**流通市值:** {float(stock_info.get('流通市值', 0))/1e8:.2f}亿")
-        
-        with info_col4:
-            st.write(f"**市盈率:** {stock_info.get('市盈率-动态', 'N/A')}")
-            st.write(f"**市净率:** {stock_info.get('市净率', 'N/A')}")
+    # 关键指标网格
+    st.markdown(f"""
+    <div class="glass-card">
+        <div class="metric-grid">
+            <div class="metric-item">
+                <div class="metric-label">今开</div>
+                <div class="metric-value">¥{price_data.get('open', 0):.2f}</div>
+            </div>
+            <div class="metric-item">
+                <div class="metric-label">最高</div>
+                <div class="metric-value">¥{price_data.get('high', 0):.2f}</div>
+            </div>
+            <div class="metric-item">
+                <div class="metric-label">最低</div>
+                <div class="metric-value">¥{price_data.get('low', 0):.2f}</div>
+            </div>
+            <div class="metric-item">
+                <div class="metric-label">换手率</div>
+                <div class="metric-value">{stock_info.get('换手率', '- ')}%</div>
+            </div>
+            <div class="metric-item">
+                <div class="metric-label">总市值</div>
+                <div class="metric-value">{float(stock_info.get('总市值', 0))/1e8:.1f}亿</div>
+            </div>
+            <div class="metric-item">
+                <div class="metric-label">市盈率(动)</div>
+                <div class="metric-value">{stock_info.get('市盈率-动态', '-')}</div>
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
     
     # 计算技术指标
     indicators_data = indicators.calculate_all_indicators(hist_df)
