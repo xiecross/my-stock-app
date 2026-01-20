@@ -14,16 +14,18 @@ def load_custom_css():
     <style>
     /* 主题色彩 */
     :root {
-        --primary-color: #1f77b4;
-        --success-color: #2ecc71;
-        --danger-color: #e74c3c;
-        --warning-color: #f39c12;
-        --bg-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        --primary-color: #667eea;
+        --secondary-color: #764ba2;
+        --success-color: #10b981;
+        --danger-color: #ef4444;
+        --warning-color: #f59e0b;
+        --info-color: #3b82f6;
     }
     
     /* 主容器样式 */
     .main {
-        background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+        background: linear-gradient(135deg, #f8fafc 0%, #e0e7ff 100%);
+        padding: 2rem 1rem;
     }
     
     /* 标题样式 */
@@ -31,66 +33,201 @@ def load_custom_css():
         background: linear-gradient(120deg, #667eea 0%, #764ba2 100%);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
+        background-clip: text;
         font-weight: 800;
         text-align: center;
-        padding: 1rem 0;
+        padding: 0.5rem 0 1.5rem 0;
+        margin-bottom: 1rem;
+        font-size: 2.5rem;
     }
     
-    /* 指标卡片样式 */
-    [data-testid="stMetricValue"] {
-        font-size: 2rem;
+    /* 子标题样式 */
+    h3 {
+        color: #1e293b;
         font-weight: 700;
+        margin-top: 2rem;
+        margin-bottom: 1rem;
+        padding: 0.5rem 0;
+        border-bottom: 3px solid #667eea;
+        display: inline-block;
+    }
+    
+    /* 指标卡片容器 */
+    [data-testid="stMetric"] {
+        background: white;
+        padding: 1.2rem;
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        border: 1px solid rgba(102, 126, 234, 0.1);
+        transition: all 0.3s ease;
+    }
+    
+    [data-testid="stMetric"]:hover {
+        box-shadow: 0 4px 16px rgba(102, 126, 234, 0.2);
+        transform: translateY(-2px);
+    }
+    
+    /* 指标标签 */
+    [data-testid="stMetricLabel"] {
+        font-size: 0.875rem;
+        font-weight: 600;
+        color: #64748b;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    /* 指标值 */
+    [data-testid="stMetricValue"] {
+        font-size: 1.75rem;
+        font-weight: 800;
+        color: #1e293b;
+    }
+    
+    /* 指标变化 */
+    [data-testid="stMetricDelta"] {
+        font-size: 0.875rem;
+        font-weight: 600;
     }
     
     /* 侧边栏样式 */
     [data-testid="stSidebar"] {
         background: linear-gradient(180deg, #667eea 0%, #764ba2 100%);
+        padding: 1rem 0.5rem;
     }
     
-    [data-testid="stSidebar"] * {
+    [data-testid="stSidebar"] > div:first-child {
+        padding-top: 2rem;
+    }
+    
+    [data-testid="stSidebar"] h2 {
         color: white !important;
+        font-weight: 700;
+        margin-bottom: 1.5rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 2px solid rgba(255,255,255,0.3);
+    }
+    
+    [data-testid="stSidebar"] label {
+        color: white !important;
+        font-weight: 600;
+        font-size: 0.875rem;
+    }
+    
+    [data-testid="stSidebar"] input,
+    [data-testid="stSidebar"] select {
+        background: rgba(255,255,255,0.9) !important;
+        border: none !important;
+        border-radius: 8px !important;
+        color: #1e293b !important;
     }
     
     /* 按钮样式 */
     .stButton>button {
-        border-radius: 20px;
-        font-weight: 600;
+        border-radius: 25px;
+        font-weight: 700;
+        padding: 0.6rem 2rem;
         transition: all 0.3s ease;
+        border: none;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        font-size: 0.875rem;
+    }
+    
+    .stButton>button[kind="primary"] {
+        background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+        box-shadow: 0 4px 12px rgba(249, 115, 22, 0.4);
     }
     
     .stButton>button:hover {
         transform: translateY(-2px);
-        box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        box-shadow: 0 6px 20px rgba(0,0,0,0.3);
     }
     
     /* 标签页样式 */
     .stTabs [data-baseweb="tab-list"] {
-        gap: 8px;
+        gap: 0.5rem;
+        background: white;
+        padding: 0.5rem;
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
     }
     
     .stTabs [data-baseweb="tab"] {
-        border-radius: 10px 10px 0 0;
-        padding: 10px 20px;
+        border-radius: 8px;
+        padding: 0.75rem 1.5rem;
         font-weight: 600;
+        color: #64748b;
+        background: transparent;
+        border: none;
+    }
+    
+    .stTabs [aria-selected="true"] {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white !important;
     }
     
     /* 数据框样式 */
     [data-testid="stDataFrame"] {
-        border-radius: 10px;
+        border-radius: 12px;
         overflow: hidden;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
     }
     
     /* 扩展器样式 */
     .streamlit-expanderHeader {
-        background-color: rgba(102, 126, 234, 0.1);
-        border-radius: 10px;
-        font-weight: 600;
+        background: white;
+        border: 1px solid rgba(102, 126, 234, 0.2);
+        border-radius: 12px;
+        font-weight: 700;
+        color: #1e293b;
+        padding: 1rem;
+        transition: all 0.3s ease;
+    }
+    
+    .streamlit-expanderHeader:hover {
+        background: rgba(102, 126, 234, 0.05);
+        border-color: #667eea;
     }
     
     /* 信息框样式 */
     .stAlert {
-        border-radius: 10px;
+        border-radius: 12px;
         border-left: 5px solid;
+        padding: 1rem 1.5rem;
+        background: white;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
+    
+    /* 复选框样式 */
+    [data-testid="stSidebar"] .stCheckbox {
+        background: rgba(255,255,255,0.1);
+        padding: 0.5rem;
+        border-radius: 8px;
+        margin: 0.25rem 0;
+    }
+    
+    /* 分隔线样式 */
+    hr {
+        margin: 2rem 0;
+        border: none;
+        border-top: 2px solid rgba(102, 126, 234, 0.2);
+    }
+    
+    /* 卡片容器 */
+    .metric-card {
+        background: white;
+        padding: 1.5rem;
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        border-left: 4px solid #667eea;
+        margin-bottom: 1rem;
+    }
+    
+    /* 图表容器 */
+    .js-plotly-plot {
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 2px 12px rgba(0,0,0,0.08);
     }
     </style>
     """, unsafe_allow_html=True)
@@ -438,7 +575,14 @@ if check_password():
             latest = hist_df.iloc[-1]
             
             # --- 第一部分：实时核心指标 ---
-            st.markdown("### 💹 实时概览")
+            st.markdown("""
+            <div style='background: white; padding: 1rem 1.5rem; border-radius: 12px; margin-bottom: 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.08);'>
+                <h3 style='margin: 0; color: #1e293b; border: none; display: flex; align-items: center;'>
+                    <span style='background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 0.4rem 0.8rem; border-radius: 8px; margin-right: 0.75rem; font-size: 1rem;'>✓</span>
+                    实时概览
+                </h3>
+            </div>
+            """, unsafe_allow_html=True)
             
             # 第一行：基本信息
             col1, col2, col3, col4 = st.columns(4)
@@ -473,8 +617,16 @@ if check_password():
                     help="当日成交量占流通股本比例"
                 )
             
+            
             # 第二行：技术指标
-            st.markdown("### 📊 技术指标")
+            st.markdown("""
+            <div style='background: white; padding: 1rem 1.5rem; border-radius: 12px; margin-bottom: 1.5rem; margin-top: 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.08);'>
+                <h3 style='margin: 0; color: #1e293b; border: none; display: flex; align-items: center;'>
+                    <span style='background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; padding: 0.4rem 0.8rem; border-radius: 8px; margin-right: 0.75rem; font-size: 1rem;'>📊</span>
+                    技术指标
+                </h3>
+            </div>
+            """, unsafe_allow_html=True)
             col1, col2, col3, col4, col5 = st.columns(5)
             
             with col1:
