@@ -445,7 +445,7 @@ def check_password():
 # ---------------------------------------------------------
 # 缓存数据获取函数 - 缩短缓存时间以获取更实时的数据
 # ---------------------------------------------------------
-@st.cache_data(ttl=300)  # 5分钟缓存
+@st.cache_data(ttl=180)  # 3分钟缓存
 def get_stock_info(symbol):
     """获取股票基本信息"""
     try:
@@ -457,7 +457,7 @@ def get_stock_info(symbol):
         st.error(f"获取股票信息失败: {e}")
         return None
 
-@st.cache_data(ttl=30)  # 30秒缓存
+@st.cache_data(ttl=180)  # 3分钟缓存
 def get_realtime_quote(symbol):
     """获取实时行情（带降级方案）"""
     quote = {}
@@ -518,7 +518,7 @@ def get_realtime_quote(symbol):
         
     return None
 
-@st.cache_data(ttl=300)  # 5分钟缓存
+@st.cache_data(ttl=180)  # 3分钟缓存
 def get_stock_history(symbol, start_date, end_date, adjust='qfq'):
     """获取历史行情数据"""
     try:
@@ -619,7 +619,7 @@ def handle_search_submit():
 def is_valid_stock_code(code):
     return len(code) == 6 and code.isdigit()
 
-@st.cache_data(ttl=60)  # 1分钟缓存
+@st.cache_data(ttl=180)  # 3分钟缓存
 def get_market_indices():
     """获取市场指数实时数据（并行加速）"""
     try:
