@@ -100,14 +100,35 @@ def load_custom_css():
 # ---------------------------------------------------------
 def check_password():
     """验证登录状态"""
-    if st.query_params.get("auth") == st.secrets["app_password"]:
+    # 检查 secrets 是否配置
+    try:
+        app_password = st.secrets["app_password"]
+    except KeyError:
+        st.error("❌ 配置错误：未找到 app_password")
+        st.info("""
+        ### 🔧 配置说明
+        
+        请在 Streamlit Cloud 的 Secrets 中添加以下配置：
+        
+        ```toml
+        app_password = "your_password_here"
+        ```
+        
+        **本地开发**：创建 `.streamlit/secrets.toml` 文件并添加上述内容
+        
+        **Streamlit Cloud**：在应用设置 → Secrets 中添加上述内容
+        """)
+        st.stop()
+        return False
+    
+    if st.query_params.get("auth") == app_password:
         st.session_state["password_correct"] = True
         return True
 
     def password_entered():
-        if st.session_state["password"] == st.secrets["app_password"]:
+        if st.session_state["password"] == app_password:
             st.session_state["password_correct"] = True
-            st.query_params["auth"] = st.secrets["app_password"]
+            st.query_params["auth"] = app_password
             del st.session_state["password"] 
         else:
             st.session_state["password_correct"] = False
