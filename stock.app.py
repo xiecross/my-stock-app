@@ -455,103 +455,17 @@ def get_stock_history(symbol, start_date, end_date, adjust='qfq'):
         return None
 
 # ---------------------------------------------------------
-# 股票数据库管理 - 内存缓存（适配Streamlit Cloud）
+# 股票数据接口 - 按需获取单个股票
 # ---------------------------------------------------------
 
-@st.cache_data(ttl=3600)  # 每小时缓存一次股票列表
-def get_all_stocks_list():
-    """获取全量股票列表（带缓存）"""
-    try:
-        stock_list = ak.stock_zh_a_spot_em()
-        stocks_dict = {}
-        for _, row in stock_list.iterrows():
-            code = str(row['代码'])
-            name = str(row['名称'])
-            stocks_dict[code] = name
-        return stocks_dict, datetime.now().timestamp()
-    except Exception as e:
-        print(f"获取股票列表失败: {e}")
-        return None, 0
+def validate_stock_code(code):
+    """简单验证股票代码格式"""
+    if not code:
+        return False
+    # A股代码通常为6位数字
+    return len(code) == 6 and code.isdigit()
 
-def load_stock_database_to_session():
-    """懒加载股票数据库到session_state"""
-    if 'stock_database' not in st.session_state:
-        st.session_state.stock_database = None
-        st.session_state.stock_db_update_time = 0
-    
-    if st.session_state.stock_database is None:
-        with st.spinner('正在初始化股票搜索数据库...'):
-            stocks, update_time = get_all_stocks_list()
-            if stocks:
-                st.session_state.stock_database = stocks
-                st.session_state.stock_db_update_time = update_time
-    
-    return st.session_state.stock_database, st.session_state.stock_db_update_time
-
-def search_stock_fast(query):
-    """快速搜索股票（使用内存数据库）"""
-    try:
-        stocks, update_time = load_stock_database_to_session()
-        
-        if not stocks:
-            # 如果数据库为空，回退到在线搜索
-            return search_stock_online(query)
-        
-        query = query.upper()
-        results = []
-        
-        # 搜索代码和名称
-        for code, name in stocks.items():
-            if query in code or query in name:
-                results.append({'代码': code, '名称': name})
-                if len(results) >= 20:  # 限制返回20条
-                    break
-        
-        if results:
-            df = pd.DataFrame(results)
-            return df
-        else:
-            return pd.DataFrame(columns=['代码', '名称'])
-            
-    except Exception as e:
-        st.error(f"搜索失败: {e}")
-        return None
-
-def search_stock_online(query):
-    """在线搜索股票（备用方案）"""
-    try:
-        stock_list = ak.stock_zh_a_spot_em()
-        query = query.upper()
-        filtered = stock_list[
-            stock_list['代码'].str.contains(query) | 
-            stock_list['名称'].str.contains(query)
-        ].head(20)
-        return filtered[['代码', '名称']]
-    except Exception as e:
-        st.error(f"在线搜索失败: {e}")
-        return None
-
-def force_refresh_stock_database():
-    """强制刷新股票数据库"""
-    try:
-        stock_list = ak.stock_zh_a_spot_em()
-        stocks_dict = {}
-        for _, row in stock_list.iterrows():
-            code = str(row['代码'])
-            name = str(row['名称'])
-            stocks_dict[code] = name
-        
-        st.session_state.stock_database = stocks_dict
-        st.session_state.stock_db_update_time = datetime.now().timestamp()
-        return stocks_dict, st.session_state.stock_db_update_time
-    except Exception as e:
-        st.error(f"刷新失败: {e}")
-        return {}, 0
-
-# 兼容旧代码的函数名
-def search_stock(query):
-    """搜索股票（优化版本）"""
-    return search_stock_fast(query)
+# 移除了原有的全量股票数据库加载和搜索逻辑，以提高性能
 
 @st.cache_data(ttl=60)  # 1分钟缓存 - 更实时的市场数据
 def get_market_indices():
@@ -766,51 +680,33 @@ if not check_password():
 with st.sidebar:
     st.header("⚙️ 控制台")
     
-    st.divider()
+    # 股票加载
+    st.subheader("🔍 加载股票")
+    input_code = st.text_input("输入股票代码", value=st.session_state.current_stock, placeholder="例如: 600519")
     
-    # 数据库状态显示 - 仅在已加载时显示
-    if 'stock_database' in st.session_state and st.session_state.stock_database:
-        stocks = st.session_state.stock_database
-        update_time = st.session_state.stock_db_update_time
-        update_datetime = datetime.fromtimestamp(update_time)
-        
-        with st.expander("📊 股票搜索数据库状态", expanded=False):
-            st.write(f"**股票数量:** {len(stocks):,} 只")
-            st.write(f"**更新时间:** {update_datetime.strftime('%Y-%m-%d %H:%M')}")
-            
-            st.caption("💡 数据库已懒加载至内存，提高搜索速度")
-            
-            if st.button("🔄 强制更新数据库", use_container_width=True):
-                st.cache_data.clear() # 清除缓存
-                st.session_state.stock_database = None
+    col_load, col_add = st.columns(2)
+    with col_load:
+        if st.button("� 加载", use_container_width=True):
+            if validate_stock_code(input_code):
+                st.session_state.current_stock = input_code
                 st.rerun()
+            else:
+                st.error("请输入有效的6位股票代码")
     
-    st.divider()
-    
-    # 股票搜索
-    search_query = st.text_input("🔍 搜索股票", placeholder="输入代码或名称...")
-    if search_query:
-        search_results = search_stock(search_query)
-        if search_results is not None and not search_results.empty:
-            selected = st.selectbox(
-                "选择股票",
-                search_results['代码'].tolist(),
-                format_func=lambda x: f"{x} - {search_results[search_results['代码']==x]['名称'].values[0]}"
-            )
-            col_load, col_add = st.columns(2)
-            with col_load:
-                if st.button("📊 加载", use_container_width=True):
-                    st.session_state.current_stock = selected
-                    st.rerun()
-            with col_add:
-                selected_name = search_results[search_results['代码']==selected]['名称'].values[0]
-                if selected not in st.session_state.watchlist:
-                    if st.button("⭐ 添加", use_container_width=True):
-                        st.session_state.watchlist[selected] = selected_name
-                        st.success(f"已添加 {selected} {selected_name} 到自选股")
-                        st.rerun()
-                else:
-                    st.button("✓ 已添加", disabled=True, use_container_width=True)
+    with col_add:
+        if st.button("⭐ 收藏", use_container_width=True):
+            if validate_stock_code(input_code):
+                # 尝试获取简称以展示
+                with st.spinner("正在获取股票信息..."):
+                    info = get_stock_info(input_code)
+                    if info:
+                        name = info.get('股票简称', '未知股票')
+                        st.session_state.watchlist[input_code] = name
+                        st.success(f"已加入收藏: {name}")
+                    else:
+                        st.error("无法获取股票信息，请检查代码")
+            else:
+                st.error("请输入有效的6位股票代码")
     
     st.divider()
     
