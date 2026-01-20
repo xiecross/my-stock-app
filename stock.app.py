@@ -650,30 +650,6 @@ def get_market_indices():
         return []
 
 
-def is_trading_time():
-    """判断当前是否为A股交易时间"""
-    now = datetime.now()
-    
-    # 1. 检查是否为周末 (0-4 是周一到周五)
-    if now.weekday() > 4:
-        return False
-        
-    # 2. 检查时间段
-    # 早盘集合竞价 + 交易: 9:15 - 11:30
-    # 午盘交易: 13:00 - 15:00
-    current_time = now.time()
-    
-    morning_start = datetime.strptime("09:15:00", "%H:%M:%S").time()
-    morning_end = datetime.strptime("11:30:00", "%H:%M:%S").time()
-    
-    afternoon_start = datetime.strptime("13:00:00", "%H:%M:%S").time()
-    afternoon_end = datetime.strptime("15:00:00", "%H:%M:%S").time()
-    
-    is_morning = morning_start <= current_time <= morning_end
-    is_afternoon = afternoon_start <= current_time <= afternoon_end
-    
-    return is_morning or is_afternoon
-
 def create_candlestick_chart(df, indicators_data, show_ma=True, show_boll=False):
     """创建K线图和技术指标图表"""
     # 创建子图
@@ -1016,24 +992,6 @@ with st.sidebar:
         st.session_state["password_correct"] = False
         st.query_params.clear()
         st.rerun()
-        
-    st.divider()
-    
-    # 自动刷新控制
-    st.subheader("⚡ 实时设置")
-    col_auto, col_status = st.columns([3, 1])
-    with col_auto:
-        enable_refresh = st.toggle("开盘自动刷新", value=True, help="仅在交易时段(9:15-11:30, 13:00-15:00)且开启此开关时生效，每5秒刷新一次")
-        
-    # 显示交易状态
-    trading_now = is_trading_time()
-    status_text = "交易中" if trading_now else "休市"
-    status_color = "🟢" if trading_now else "🔴"
-    with col_status:
-        st.write(f"{status_color} {status_text}")
-        
-    if enable_refresh and trading_now:
-        st.caption("🔄 实时监控中...")
 
 
 # 主界面
@@ -1229,11 +1187,3 @@ with col_footer2:
     from datetime import datetime, timedelta, timezone
     bj_time = datetime.now(timezone(timedelta(hours=8))).strftime('%H:%M:%S')
     st.caption(f"⏰ 北京时间: {bj_time}")
-
-# ---------------------------------------------------------
-# 自动刷新逻辑 (放在最后以确保渲染完成后执行)
-# ---------------------------------------------------------
-if enable_refresh and trading_now:
-    import time
-    time.sleep(5)  # 5秒刷新间隔
-    st.rerun()
