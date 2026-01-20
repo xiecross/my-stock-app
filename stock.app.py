@@ -22,18 +22,39 @@ st.markdown("""
     /* 全局字体与背景 */
     @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Noto+Sans+SC:wght@400;500;700&display=swap');
     
+    /* 默认变量（作为fallback，通常设为跟随系统或浅色） */
     :root {
-        --bg-color: #0e1117;
-        --card-bg: rgba(22, 27, 34, 0.8);
-        --card-border: rgba(48, 54, 61, 0.5);
-        --text-primary: #e6edf3;
-        --text-secondary: #8b949e;
-        --accent-color: #58a6ff;
-        --up-color: #238636;  /* GitHub Green */
-        --down-color: #da3633; /* GitHub Red */
+        --bg-color: #ffffff;
+        --card-bg: rgba(255, 255, 255, 0.8);
+        --card-border: rgba(200, 200, 200, 0.5);
+        --text-primary: #1f2328;
+        --text-secondary: #656d76;
+        --accent-color: #0969da;
+        --up-color: #1a7f37;
+        --down-color: #d1242f;
         --glass-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        --hero-bg: linear-gradient(145deg, rgba(235, 245, 255, 0.8) 0%, rgba(255, 255, 255, 0.9) 100%);
+        --hero-border: rgba(9, 105, 218, 0.2);
     }
 
+    /* 深色模式适配 */
+    @media (prefers-color-scheme: dark) {
+        :root {
+            --bg-color: #0e1117;
+            --card-bg: rgba(22, 27, 34, 0.8);
+            --card-border: rgba(48, 54, 61, 0.5);
+            --text-primary: #e6edf3;
+            --text-secondary: #8b949e;
+            --accent-color: #58a6ff;
+            --up-color: #238636;
+            --down-color: #da3633;
+            --glass-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2);
+            --hero-bg: linear-gradient(145deg, rgba(31,111,235,0.15) 0%, rgba(22,27,34,0.9) 100%);
+            --hero-border: rgba(56,139,253,0.3);
+        }
+    }
+
+    /* 应用背景色适配 */
     .stApp {
         background-color: var(--bg-color);
         font-family: 'Noto Sans SC', sans-serif;
@@ -52,8 +73,8 @@ st.markdown("""
     
     /* 英雄榜（股票头部） */
     .stock-hero {
-        background: linear-gradient(145deg, rgba(31,111,235,0.15) 0%, rgba(22,27,34,0.9) 100%);
-        border: 1px solid rgba(56,139,253,0.3);
+        background: var(--hero-bg);
+        border: 1px solid var(--hero-border);
         border-radius: 16px;
         padding: 25px;
         margin-bottom: 25px;
@@ -81,6 +102,7 @@ st.markdown("""
         font-size: 36px;
         font-weight: 700;
         line-height: 1;
+        color: var(--text-primary);
     }
     
     .price-change {
@@ -92,8 +114,8 @@ st.markdown("""
         margin-left: 10px;
     }
     
-    .up-bg { background: rgba(35, 134, 54, 0.2); color: #3fb950; }
-    .down-bg { background: rgba(218, 54, 51, 0.2); color: #f85149; }
+    .up-bg { background: rgba(35, 134, 54, 0.2); color: var(--up-color); }
+    .down-bg { background: rgba(218, 54, 51, 0.2); color: var(--down-color); }
     
     /* 关键指标网格 */
     .metric-grid {
@@ -104,7 +126,8 @@ st.markdown("""
     }
     
     .metric-item {
-        background: rgba(48, 54, 61, 0.3);
+        background: var(--card-bg);
+        border: 1px solid var(--card-border);
         border-radius: 8px;
         padding: 12px;
         text-align: center;
@@ -125,13 +148,17 @@ st.markdown("""
     
     /* 调整 Sidebar */
     section[data-testid="stSidebar"] {
-        background-color: #010409;
+        background-color: var(--bg-color); /* 随系统变色 */
         border-right: 1px solid var(--card-border);
     }
     
     /* 调整 Metric 组件样式 (覆盖原生) */
     div[data-testid="stMetricValue"] {
         font-family: 'JetBrains Mono', monospace !important;
+        color: var(--text-primary) !important;
+    }
+    div[data-testid="stMetricLabel"] {
+        color: var(--text-secondary) !important;
     }
     
     /* 分隔线优化 */
@@ -146,11 +173,14 @@ st.markdown("""
         border-radius: 8px;
         font-weight: 600;
         border: 1px solid var(--card-border);
+        color: var(--text-primary);
+        background-color: var(--card-bg);
         transition: all 0.2s;
     }
     .stButton > button:hover {
         border-color: var(--accent-color);
-        background-color: rgba(88, 166, 255, 0.1);
+        color: var(--accent-color);
+        background-color: rgba(9, 105, 218, 0.1);
     }
 </style>
 
@@ -741,9 +771,12 @@ def create_candlestick_chart(df, indicators_data, show_ma=True, show_boll=False)
         fig.add_hline(y=70, line_dash="dash", line_color="red", row=current_row, col=1)
         fig.add_hline(y=30, line_dash="dash", line_color="green", row=current_row, col=1)
     
-    # 更新布局 - 深度定制暗色主题
+    # 更新布局 - 自适应主题（透明背景）
+    # 不指定 template='plotly_dark'，让 Streamlit 自动处理或使用默认
+    # 但我们需要确保字体颜色适配，由于 Plotly 无法读取 CSS 变量，我们尽量用默认或 neutral
+    
     fig.update_layout(
-        template='plotly_dark',
+        # template='plotly_dark', # 移除强制暗色
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(0,0,0,0)',
         xaxis_rangeslider_visible=False,
@@ -754,8 +787,8 @@ def create_candlestick_chart(df, indicators_data, show_ma=True, show_boll=False)
             yanchor="bottom",
             y=1.02,
             xanchor="right",
-            x=1,
-            font=dict(color="#8b949e")
+            x=1
+            # remove fixed color to let it adapt or keep it neutral gray
         ),
         margin=dict(l=10, r=10, t=60, b=20),
         # 移动端优化配置
@@ -766,23 +799,24 @@ def create_candlestick_chart(df, indicators_data, show_ma=True, show_boll=False)
         # 触摸交互配置
         modebar=dict(
             orientation='v',
-            bgcolor='rgba(22, 27, 34, 0.8)',
+            # bgcolor='rgba(22, 27, 34, 0.8)', # Remove hardcoded bg
+            bgcolor='rgba(0,0,0,0)',
             color='#8b949e',
-            activecolor='#58a6ff'
+            activecolor='#0969da'
         )
     )
     
-    # 坐标轴样式优化
+    # 坐标轴样式优化 - 使用透明或半透明颜色以适配双模式
     fig.update_xaxes(
         showgrid=True, 
         gridwidth=1, 
-        gridcolor='rgba(48, 54, 61, 0.3)',
+        gridcolor='rgba(128, 128, 128, 0.2)', # 通用半透明灰
         zeroline=False
     )
     fig.update_yaxes(
         showgrid=True, 
         gridwidth=1, 
-        gridcolor='rgba(48, 54, 61, 0.3)',
+        gridcolor='rgba(128, 128, 128, 0.2)',
         zeroline=False
     )
     
