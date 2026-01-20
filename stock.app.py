@@ -1182,6 +1182,8 @@ else:
 st.divider()
 col_footer1, col_footer2 = st.columns([3, 1])
 with col_footer1:
-    st.caption("💡 数据来源: AKShare (东方财富) | 缓存时间: 5分钟 | 本平台仅供学习参考，不构成投资建议")
+    st.caption("💡 数据来源: AKShare (东方财富) ")
 with col_footer2:
-    st.caption(f"⏰ 当前时间: {datetime.now().strftime('%H:%M:%S')}")
+    from datetime import datetime, timedelta, timezone
+    bj_time = datetime.now(timezone(timedelta(hours=8))).strftime('%H:%M:%S')
+    st.caption(f"⏰ 北京时间: {bj_time}")
