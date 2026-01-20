@@ -364,14 +364,18 @@ def format_value(val, unit_type='amount'):
         return "-"
     
     if unit_type == 'amount':
-        if abs(val) >= 1e8:
+        if abs(val) >= 1e12:
+            return f"{val/1e12:.2f} 万亿"
+        elif abs(val) >= 1e8:
             return f"{val/1e8:.2f} 亿"
         elif abs(val) >= 1e4:
             return f"{val/1e4:.2f} 万"
         else:
             return f"{val:.2f} 元"
     elif unit_type == 'volume':
-        if abs(val) >= 1e8:
+        if abs(val) >= 1e12:
+            return f"{val/1e12:.2f} 万亿股"
+        elif abs(val) >= 1e8:
             return f"{val/1e8:.2f} 亿股"
         elif abs(val) >= 1e4:
             return f"{val/1e4:.2f} 万股"
@@ -782,6 +786,22 @@ if check_password():
                 # 美化展示
                 display_info = info_df.copy()
                 display_info.columns = ['项目', '数值']
+                
+                # 对数值列进行单位转换
+                def smart_format(row):
+                    item = row['项目']
+                    val = row['数值']
+                    # 识别需要单位转换的项目
+                    amount_items = ['总市值', '流通市值', '成交额']
+                    volume_items = ['总股本', '流通股本', '成交量']
+                    
+                    if any(x in item for x in amount_items):
+                        return format_value(val, 'amount')
+                    elif any(x in item for x in volume_items):
+                        return format_value(val, 'volume')
+                    return val
+
+                display_info['数值'] = display_info.apply(smart_format, axis=1)
                 
                 st.dataframe(
                     display_info,
