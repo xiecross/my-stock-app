@@ -6,6 +6,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from datetime import datetime, timedelta
 from functools import lru_cache
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import indicators
 
 # 页面配置
@@ -618,9 +619,9 @@ def handle_search_submit():
 def is_valid_stock_code(code):
     return len(code) == 6 and code.isdigit()
 
-@st.cache_data(ttl=60)  # 1分钟缓存 - 更实时的市场数据
+@st.cache_data(ttl=60)  # 1分钟缓存
 def get_market_indices():
-    """获取市场指数实时数据"""
+    """获取市场指数实时数据（并行加速）"""
     try:
         indices_data = []
         # 获取主要指数
@@ -630,20 +631,33 @@ def get_market_indices():
             'sz399006': '创业板指'
         }
         
-        for code, name in index_codes.items():
+        def fetch_index(code, name):
             try:
                 df = ak.stock_zh_index_daily(symbol=code)
                 if not df.empty and len(df) >= 2:
                     latest = df.iloc[-1]
                     prev = df.iloc[-2]
                     change_pct = ((latest['close'] - prev['close']) / prev['close'] * 100)
-                    indices_data.append({
+                    return {
                         'name': name,
                         'value': latest['close'],
                         'change': change_pct
-                    })
+                    }
             except:
-                continue
+                return None
+            return None
+
+        # 并行获取
+        with ThreadPoolExecutor(max_workers=3) as executor:
+            future_to_index = {executor.submit(fetch_index, c, n): n for c, n in index_codes.items()}
+            for future in as_completed(future_to_index):
+                result = future.result()
+                if result:
+                    indices_data.append(result)
+        
+        # 保持顺序（可选，上面是无序的，如果需要固定顺序可以重排，但这里展示即可）
+        # 简单排序让上证排第一
+        indices_data.sort(key=lambda x: 0 if '上证' in x['name'] else 1)
         
         return indices_data
     except Exception as e:
@@ -1002,17 +1016,22 @@ end_date = datetime.now()
 start_date = end_date - timedelta(days=period_map[period])
 
 # 获取数据
-with st.spinner('正在加载数据...'):
-    # 并行获取数据
-    stock_info = get_stock_info(st.session_state.current_stock)
-    realtime_quote = get_realtime_quote(st.session_state.current_stock)
-    
-    hist_df = get_stock_history(
-        st.session_state.current_stock,
-        start_date,
-        end_date,
-        adjust_map[adjust]
-    )
+with st.spinner('正在极速加载数据...'):
+    # 并行获取三大核心数据
+    with ThreadPoolExecutor(max_workers=3) as executor:
+        f1 = executor.submit(get_stock_info, st.session_state.current_stock)
+        f2 = executor.submit(get_realtime_quote, st.session_state.current_stock)
+        f3 = executor.submit(
+            get_stock_history,
+            st.session_state.current_stock,
+            start_date,
+            end_date,
+            adjust_map[adjust]
+        )
+        
+        stock_info = f1.result()
+        realtime_quote = f2.result()
+        hist_df = f3.result()
 
 if stock_info and hist_df is not None and not hist_df.empty:
     # 优先使用实时行情，没有则回退到历史数据最后一行
