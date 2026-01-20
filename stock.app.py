@@ -811,8 +811,6 @@ with st.sidebar:
     
     # 搜索
     st.subheader("搜索")
-    # 搜索
-    st.subheader("搜索")
     # 使用 key 和 on_change 实现回车加载
     st.text_input(
         "代码或名称", 
@@ -821,42 +819,60 @@ with st.sidebar:
         on_change=handle_search_submit
     )
     
-    # 这里我们保留一个手动按钮作为备用，但主要逻辑已在 on_change 处理
-    # 如果用户没有按回车而是想看下拉列表，我们可能需要另外的处理
-    # 但为了简化"Enter to load"，我们假设 text_input 的值就是查询词
-    
     search_query = st.session_state.get("search_query_input", "")
     
     if search_query:
-        # 注意: 如果触发了 on_change，这里可能已经 rerun 了
-        # 如果还没匹配到目标（比如名字有多个），才显示下面的选择框
-        
-        # 重新获取结果用于显示列表
         display_results = search_stock(search_query)
-        if display_results and len(display_results) > 1:
-             st.info("找到多个匹配项，请选择:")
-             options = [f"{r['code']} - {r['name']}" for r in display_results]
-             selected_label = st.selectbox("选择股票", options, key="search_select_box")
-             if st.button("加载选中", use_container_width=True):
-                  code = selected_label.split(" - ")[0]
-                  st.session_state.current_stock = code
-                  st.rerun()
-                if st.button("收藏", use_container_width=True):
-                    if selected_stock['code'] not in st.session_state.watchlist:
-                        st.session_state.watchlist[selected_stock['code']] = selected_stock['name']
-                        st.success(f"已添加收藏: {selected_stock['name']}")
-                        st.rerun()
-                    else:
-                        st.info("已在收藏夹中")
-        else:
+        
+        if not display_results:
             st.warning("未找到匹配的股票")
+            # 占位按钮
+            col_load, col_add = st.columns(2)
+            with col_load:
+                st.button("加载", disabled=True, use_container_width=True, key="btn_load_empty")
+            with col_add:
+                st.button("收藏", disabled=True, use_container_width=True, key="btn_fav_empty")
+        else:
+            # 确定当前操作的目标股票
+            target_stock = None
+            
+            if len(display_results) == 1:
+                target_stock = display_results[0]
+            else:
+                st.info("找到多个匹配项:")
+                options = [f"{r['code']} - {r['name']}" for r in display_results]
+                selected_label = st.selectbox("选择股票", options, key="search_select_box")
+                # 解析选中的代码
+                if selected_label:
+                    code = selected_label.split(" - ")[0]
+                    target_stock = next((r for r in display_results if r['code'] == code), None)
+            
+            # 显示操作按钮
+            if target_stock:
+                col_load, col_add = st.columns(2)
+                with col_load:
+                    # 如果只有1个结果且已经在 handle_search_submit 中加载了，这里按钮可以只是再次加载
+                    if st.button("加载", use_container_width=True, key="btn_load_manual"):
+                        st.session_state.current_stock = target_stock['code']
+                        st.rerun()
+                
+                with col_add:
+                    if st.button("收藏", use_container_width=True, key="btn_fav_manual"):
+                        if target_stock['code'] not in st.session_state.watchlist:
+                            st.session_state.watchlist[target_stock['code']] = target_stock['name']
+                            st.success(f"已收藏: {target_stock['name']}")
+                            time.sleep(1) # 给一点时间显示成功提示
+                            st.rerun()
+                        else:
+                            st.info("已在收藏夹中")
+
     else:
-        # 如果没有搜索词，显示当前股票的快速操作
+        # 如果没有搜索词，显示默认状态
         col_load, col_add = st.columns(2)
         with col_load:
-            st.button("加载", disabled=True, use_container_width=True)
+            st.button("加载", disabled=True, use_container_width=True, key="btn_load_default")
         with col_add:
-            st.button("收藏", disabled=True, use_container_width=True)
+            st.button("收藏", disabled=True, use_container_width=True, key="btn_fav_default")
     
     st.divider()
     
