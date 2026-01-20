@@ -482,7 +482,7 @@ def create_candlestick_chart(df, show_ma=True, show_bb=False):
     # 更新布局
     fig.update_layout(
         height=800,
-        xaxis_rangeslider_visible=False,
+        xaxis_rangeslider_visible=True,  # 启用范围滑块
         hovermode='x unified',
         template='plotly_white',
         margin=dict(t=30, b=30, l=50, r=50),
@@ -492,6 +492,14 @@ def create_candlestick_chart(df, show_ma=True, show_bb=False):
             y=1.02,
             xanchor="right",
             x=1
+        ),
+        # 启用十字光标跟踪
+        xaxis=dict(
+            showspikes=True,
+            spikemode='across',
+            spikesnap='cursor',
+            spikedash='dash',
+            spikethickness=1
         )
     )
     
@@ -518,7 +526,15 @@ def create_volume_chart(df):
         template='plotly_white',
         margin=dict(t=10, b=30, l=50, r=50),
         xaxis_title='日期',
-        yaxis_title='成交量'
+        yaxis_title='成交量',
+        # 启用十字光标跟踪
+        xaxis=dict(
+            showspikes=True,
+            spikemode='across',
+            spikesnap='cursor',
+            spikedash='dash',
+            spikethickness=1
+        )
     )
     
     return fig
@@ -715,13 +731,19 @@ if check_password():
             with tab_chart:
                 st.plotly_chart(
                     create_candlestick_chart(hist_df, show_ma, show_bb),
-                    use_container_width=True
+                    use_container_width=True,
+                    config={
+                        'scrollZoom': True,
+                        'displaylogo': False,
+                        'modeBarButtonsToAdd': ['drawline', 'drawopenpath', 'eraseshape']
+                    }
                 )
 
             with tab_volume:
                 st.plotly_chart(
                     create_volume_chart(hist_df),
-                    use_container_width=True
+                    use_container_width=True,
+                    config={'displaylogo': False}
                 )
                 
                 # 成交量统计
