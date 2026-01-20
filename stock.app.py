@@ -445,7 +445,7 @@ def check_password():
 # ---------------------------------------------------------
 # 缓存数据获取函数 - 缩短缓存时间以获取更实时的数据
 # ---------------------------------------------------------
-@st.cache_data(ttl=180)  # 3分钟缓存
+@st.cache_data(ttl=30)  # 30秒缓存
 def get_stock_info(symbol):
     """获取股票基本信息"""
     try:
@@ -457,7 +457,7 @@ def get_stock_info(symbol):
         st.error(f"获取股票信息失败: {e}")
         return None
 
-@st.cache_data(ttl=180)  # 3分钟缓存
+@st.cache_data(ttl=30)  # 30秒缓存
 def get_realtime_quote(symbol):
     """获取实时行情（带降级方案）"""
     quote = {}
@@ -518,7 +518,7 @@ def get_realtime_quote(symbol):
         
     return None
 
-@st.cache_data(ttl=180)  # 3分钟缓存
+@st.cache_data(ttl=30)  # 30秒缓存
 def get_stock_history(symbol, start_date, end_date, adjust='qfq'):
     """获取历史行情数据"""
     try:
@@ -619,7 +619,7 @@ def handle_search_submit():
 def is_valid_stock_code(code):
     return len(code) == 6 and code.isdigit()
 
-@st.cache_data(ttl=180)  # 3分钟缓存
+@st.cache_data(ttl=60)  # 1分钟缓存
 def get_market_indices():
     """获取市场指数实时数据（并行加速）"""
     try:
@@ -1068,7 +1068,7 @@ if stock_info and hist_df is not None and not hist_df.empty:
         <div>
             <div class="hero-title">{stock_info.get('股票简称', '未知股票')} ({st.session_state.current_stock})</div>
             <div class="hero-subtitle">
-                {stock_info.get('行业', '行业未知')} | 
+                {stock_info.get('行业', '行业未知')} | {stock_info.get('地域', '地域未知')} | 
                 <span style="color: {'#3fb950' if is_up else '#f85149'}">{arrow} {abs(change_pct):.2f}%</span>
             </div>
         </div>
@@ -1152,7 +1152,9 @@ if stock_info and hist_df is not None and not hist_df.empty:
     if auto_refresh:
         import time
         # 使用 st.empty() 创建占位符用于倒计时
-        refresh_placeholder = st.empty() 
+        refresh_placeholder = st.empty()
+        refresh_placeholder.info("⏱️ 下次刷新: 5分钟后")
+        # 注意: Streamlit 会在5分钟后自动重新运行由于缓存过期
     
     # 显示图表
     st.plotly_chart(
@@ -1204,10 +1206,3 @@ with col_footer2:
     from datetime import datetime, timedelta, timezone
     bj_time = datetime.now(timezone(timedelta(hours=8))).strftime('%H:%M:%S')
     st.caption(f"⏰ 北京时间: {bj_time}")
-
-# 自动刷新 - 手动设置间隔 (不低于30s)
-refresh_interval = st.sidebar.number_input("刷新间隔 (秒)", min_value=30, value=60, step=10)
-if auto_refresh:
-    import time
-    time.sleep(refresh_interval)
-    st.rerun()
