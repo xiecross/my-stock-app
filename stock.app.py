@@ -757,6 +757,29 @@ if check_password():
             ])
 
             with tab_chart:
+                # --- 区间统计数据计算 ---
+                p_high = hist_df['最高'].max()
+                p_low = hist_df['最低'].min()
+                p_start_price = hist_df.iloc[0]['收盘']
+                p_end_price = latest['收盘']
+                p_return = (p_end_price - p_start_price) / p_start_price * 100
+                p_amplitude = (p_high - p_low) / p_start_price * 100
+                p_avg_turnover = hist_df['成交额'].mean()
+
+                # 区间指标展示
+                st.markdown("<div style='margin-bottom: 1rem;'></div>", unsafe_allow_html=True)
+                c1, c2, c3, c4, c5 = st.columns(5)
+                with c1:
+                    st.metric("区间最高", f"¥{p_high:.2f}")
+                with c2:
+                    st.metric("区间最低", f"¥{p_low:.2f}")
+                with c3:
+                    st.metric("区间涨跌", f"{p_return:.2f}%", delta_color="normal")
+                with c4:
+                    st.metric("区间振幅", f"{p_amplitude:.2f}%")
+                with c5:
+                    st.metric("日均成交额", format_value(p_avg_turnover))
+                
                 st.plotly_chart(
                     create_candlestick_chart(hist_df, show_ma, show_bb),
                     use_container_width=True,
