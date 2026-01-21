@@ -640,7 +640,7 @@ if check_password():
             </div>
             """, unsafe_allow_html=True)
             
-            # 第一行：基本信息
+            # 第一行：核心数据
             col1, col2, col3, col4 = st.columns(4)
             
             with col1:
@@ -672,6 +672,21 @@ if check_password():
                     f"{latest['换手率']:.2f}%",
                     help="当日成交量占流通股本比例"
                 )
+
+            # 第二行：盘中价格
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.metric("今日开盘", f"¥{latest['开盘']:.2f}")
+            with col2:
+                st.metric("今日最高", f"¥{latest['最高']:.2f}")
+            with col3:
+                st.metric("今日最低", f"¥{latest['最低']:.2f}")
+            with col4:
+                if len(hist_df) > 1:
+                    prev_close = hist_df.iloc[-2]['收盘']
+                    st.metric("昨日收盘", f"¥{prev_close:.2f}")
+                else:
+                    st.metric("昨日收盘", "-")
             
             
             # 第二行：技术指标
