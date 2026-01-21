@@ -5,6 +5,7 @@ import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import datetime
+import time
 
 # ---------------------------------------------------------
 # 自定义 CSS 样式
@@ -606,7 +607,12 @@ if check_password():
         show_bb = st.checkbox("显示布林带", value=False)
         
         st.divider()
-        btn_query = st.button("🔄 更新行情", type="primary", use_container_width=True)
+        st.subheader("⏱️ 自动刷新设置")
+        auto_refresh = st.toggle("开启自动刷新", value=False, help="启用后，数据将按设定频率自动跳动更新")
+        refresh_interval = st.slider("刷新频率 (秒)", 60, 300, 60, help="为了保护数据源，建议设为 60 秒以上")
+        
+        st.divider()
+        btn_query = st.button("🔄 手动更新行情", type="primary", use_container_width=True)
         
         st.divider()
         if st.button("🔒 安全登出", use_container_width=True):
@@ -629,6 +635,14 @@ if check_password():
             # 数据预处理
             info_dict = dict(zip(info_df['item'], info_df['value']))
             latest = hist_df.iloc[-1]
+            
+            # 显示更新时间
+            update_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            st.markdown(f"""
+            <div style='text-align: right; color: #64748b; font-size: 0.85rem; margin-top: -1rem; margin-bottom: 1rem;'>
+                ⏱️ 数据最后更新时间: {update_time}
+            </div>
+            """, unsafe_allow_html=True)
             
             # --- 第一部分：实时核心指标 ---
             st.markdown("""
@@ -929,3 +943,8 @@ if check_password():
 
     st.divider()
     st.caption("⚠️ 注：本终端数据同步自公开市场，仅供参考，不构成任何投资建议。")
+
+    # 自动刷新逻辑
+    if auto_refresh:
+        time.sleep(refresh_interval)
+        st.rerun()
